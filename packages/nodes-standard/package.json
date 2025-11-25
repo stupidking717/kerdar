@@ -1,0 +1,42 @@
+{
+  "name": "@kerdar/nodes-standard",
+  "version": "0.1.0",
+  "description": "Standard node types for KERDAR workflow designer",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --external @kerdar/core",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --external @kerdar/core --watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@kerdar/core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@kerdar/core": "workspace:*",
+    "@types/node": "^20.11.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  },
+  "keywords": [
+    "kerdar",
+    "workflow",
+    "nodes",
+    "n8n",
+    "automation"
+  ],
+  "license": "MIT"
+}
