@@ -1,4 +1,4 @@
-import type { NodeTypeDefinition, INodeExecutionData } from '@kerdar/core';
+import type { NodeTypeDefinition, INodeExecutionData, DynamicSchemaFn } from '@kerdar/core';
 import {
   NodeCategory,
   NodeInputType,
@@ -6,7 +6,77 @@ import {
   PropertyType,
   HttpMethod,
   AuthenticationType,
+  createSchema,
+  stringProperty,
+  integerProperty,
+  objectProperty,
+  anyProperty,
 } from '@kerdar/core';
+
+/**
+ * Dynamic output schema for HTTP Request node
+ * Changes based on whether fullResponse option is enabled
+ */
+const httpRequestOutputSchema: DynamicSchemaFn = (params) => {
+  const options = params.options as Record<string, unknown> | undefined;
+  const fullResponse = options?.fullResponse as boolean;
+
+  if (fullResponse) {
+    // Full response schema includes headers and status code
+    return createSchema(
+      {
+        data: anyProperty({
+          displayName: 'Response Data',
+          description: 'The response body from the HTTP request',
+          example: { id: 1, name: 'Example' },
+        }),
+        statusCode: integerProperty({
+          displayName: 'Status Code',
+          description: 'HTTP response status code',
+          example: 200,
+          minimum: 100,
+          maximum: 599,
+        }),
+        headers: objectProperty(
+          {},
+          {
+            displayName: 'Response Headers',
+            description: 'HTTP response headers',
+            additionalProperties: stringProperty(),
+            example: {
+              'content-type': 'application/json',
+              'x-request-id': '12345',
+            },
+          }
+        ),
+      },
+      {
+        displayName: 'HTTP Response (Full)',
+        description: 'Complete HTTP response including headers and status',
+        example: {
+          data: { id: 1, name: 'Example' },
+          statusCode: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      }
+    );
+  }
+
+  // Simple response schema - just the response body
+  return createSchema(
+    {
+      // Response body fields depend on the API being called
+      // Using 'any' type since we don't know the structure
+    },
+    {
+      displayName: 'HTTP Response',
+      description: 'Response body from the HTTP request',
+      additionalProperties: anyProperty({
+        description: 'API response fields vary based on the endpoint called',
+      }),
+    }
+  );
+};
 
 /**
  * HTTP Request Node
@@ -38,6 +108,9 @@ export const HttpRequestNode: NodeTypeDefinition = {
       displayName: 'Output',
     },
   ],
+
+  // Dynamic schema that changes based on fullResponse option
+  outputSchema: httpRequestOutputSchema,
 
   credentials: [
     {

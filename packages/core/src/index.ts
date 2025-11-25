@@ -106,6 +106,17 @@ export {
   registerNode,
   registerNodes,
   getNodeType,
+
+  // Schema context store
+  useSchemaContextStore,
+  useSchemaContext,
+  useSchemaSuggestions,
+  useMockData,
+  getSchemaContext,
+  getSchemaSuggestions,
+  getMockDataForNode,
+  resolveNodeSchema,
+  getSchemaExpressionVariables,
 } from './store';
 
 // Execution engine
@@ -142,6 +153,45 @@ export {
   ScheduleInterval,
   PanelPosition,
   ContextMenuAction,
+} from './types';
+
+// Schema types
+export type {
+  SchemaPropertyType,
+  SchemaStringFormat,
+  SchemaProperty,
+  DataSchema,
+  DynamicSchemaFn,
+  SchemaDefinition,
+  ResolvedSchema,
+  SchemaContext,
+  SchemaSuggestion,
+} from './types';
+
+// Schema builders and utilities
+export {
+  stringProperty,
+  numberProperty,
+  integerProperty,
+  booleanProperty,
+  arrayProperty,
+  objectProperty,
+  anyProperty,
+  createSchema,
+  httpResponseSchema,
+  webhookRequestSchema,
+  paginationSchema,
+  timestampProperty,
+  idProperty,
+  emailProperty,
+  isDynamicSchema,
+  resolveSchema,
+  getPropertyByPath,
+  mergeSchemas,
+  generateMockData,
+  generateMockValue,
+  schemaToSuggestions,
+  validateAgainstSchema,
 } from './types';
 
 // Types - Interfaces

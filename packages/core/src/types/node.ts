@@ -7,6 +7,7 @@ import {
   ValidationType,
   CodeLanguage,
 } from './enums';
+import type { SchemaDefinition } from './schema';
 
 /**
  * Node Type Definition - defines a type of node that can be used in workflows
@@ -54,6 +55,26 @@ export interface NodeTypeDefinition {
 
   /** Output port configuration */
   outputs: NodeOutput[];
+
+  /**
+   * Input data schema - describes what data structure this node expects
+   * Can be a static schema or a function that returns a schema based on parameters
+   * Used for:
+   * - Expression editor autocomplete
+   * - Type validation between connections
+   * - Documentation generation
+   */
+  inputSchema?: SchemaDefinition;
+
+  /**
+   * Output data schema - describes what data structure this node produces
+   * Can be a static schema or a function that returns a schema based on parameters
+   * Used for:
+   * - Expression editor autocomplete for downstream nodes
+   * - Workflow simulation with mock data
+   * - Type validation between connections
+   */
+  outputSchema?: SchemaDefinition;
 
   /** Credentials this node can use */
   credentials?: CredentialTypeConfig[];

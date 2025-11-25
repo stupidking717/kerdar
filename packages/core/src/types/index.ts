@@ -1,6 +1,47 @@
 // Enums
 export * from './enums';
 
+// Schema types
+export type {
+  SchemaPropertyType,
+  SchemaStringFormat,
+  SchemaProperty,
+  DataSchema,
+  DynamicSchemaFn,
+  SchemaDefinition,
+  ResolvedSchema,
+  SchemaContext,
+  SchemaSuggestion,
+} from './schema';
+
+export {
+  // Schema builders
+  stringProperty,
+  numberProperty,
+  integerProperty,
+  booleanProperty,
+  arrayProperty,
+  objectProperty,
+  anyProperty,
+  createSchema,
+  // Common schema templates
+  httpResponseSchema,
+  webhookRequestSchema,
+  paginationSchema,
+  timestampProperty,
+  idProperty,
+  emailProperty,
+  // Schema utilities
+  isDynamicSchema,
+  resolveSchema,
+  getPropertyByPath,
+  mergeSchemas,
+  generateMockData,
+  generateMockValue,
+  schemaToSuggestions,
+  validateAgainstSchema,
+} from './schema';
+
 // Node types
 export type {
   NodeTypeDefinition,

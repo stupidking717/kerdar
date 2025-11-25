@@ -1,11 +1,82 @@
-import type { NodeTypeDefinition } from '@kerdar/core';
+import type { NodeTypeDefinition, DataSchema } from '@kerdar/core';
 import {
   NodeCategory,
   PropertyType,
   NodeOutputType,
   WebhookMethod,
   WebhookResponseMode,
+  createSchema,
+  stringProperty,
+  objectProperty,
+  anyProperty,
 } from '@kerdar/core';
+
+/**
+ * Output schema for Webhook Trigger
+ * Describes the structure of data produced when a webhook is received
+ */
+const webhookOutputSchema: DataSchema = createSchema(
+  {
+    headers: objectProperty(
+      {},
+      {
+        displayName: 'Headers',
+        description: 'HTTP request headers',
+        additionalProperties: stringProperty(),
+        example: {
+          'content-type': 'application/json',
+          'user-agent': 'Webhook-Client/1.0',
+        },
+      }
+    ),
+    params: objectProperty(
+      {},
+      {
+        displayName: 'URL Parameters',
+        description: 'URL path parameters',
+        additionalProperties: stringProperty(),
+      }
+    ),
+    query: objectProperty(
+      {},
+      {
+        displayName: 'Query Parameters',
+        description: 'Query string parameters',
+        additionalProperties: anyProperty(),
+        example: { page: '1', limit: '10' },
+      }
+    ),
+    body: anyProperty({
+      displayName: 'Body',
+      description: 'Request body (parsed JSON or raw)',
+      example: { message: 'Hello', data: { id: 1 } },
+    }),
+    webhookUrl: stringProperty({
+      displayName: 'Webhook URL',
+      description: 'The full URL that was called',
+      format: 'url',
+      example: 'https://your-domain.com/webhook/my-endpoint',
+    }),
+    executionMode: stringProperty({
+      displayName: 'Execution Mode',
+      description: 'How the webhook was triggered',
+      enum: ['webhook', 'manual'],
+      example: 'webhook',
+    }),
+  },
+  {
+    displayName: 'Webhook Data',
+    description: 'Data received from incoming webhook request',
+    example: {
+      headers: { 'content-type': 'application/json' },
+      params: {},
+      query: {},
+      body: {},
+      webhookUrl: 'https://your-domain.com/webhook/test',
+      executionMode: 'webhook',
+    },
+  }
+);
 
 /**
  * Webhook Trigger Node
@@ -29,6 +100,9 @@ export const WebhookTriggerNode: NodeTypeDefinition = {
       displayName: 'Output',
     },
   ],
+
+  // Schema defining what data this node produces
+  outputSchema: webhookOutputSchema,
 
   properties: [
     {

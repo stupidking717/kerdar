@@ -77,3 +77,16 @@ export {
   registerNodes,
   getNodeType,
 } from './node-registry-store';
+
+// Schema context store
+export {
+  useSchemaContextStore,
+  useSchemaContext,
+  useSchemaSuggestions,
+  useMockData,
+  getSchemaContext,
+  getSchemaSuggestions,
+  getMockDataForNode,
+  resolveNodeSchema,
+  getSchemaExpressionVariables,
+} from './schema-context-store';
