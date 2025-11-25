@@ -21,6 +21,22 @@ export { NodeSidebar, type NodeSidebarProps } from './components/NodeSidebar';
 // Execution History
 export { ExecutionHistory, type ExecutionHistoryProps, type ExecutionRecord } from './components/ExecutionHistory';
 
+// NDV (Node Details View) components
+export {
+  NodeDetailsView,
+  type NodeDetailsViewProps,
+  InputDataPanel,
+  type InputDataPanelProps,
+  type InputDataItem,
+  ParameterInput,
+  type ParameterInputProps,
+  ExpressionEditor,
+  type ExpressionEditorProps,
+  type ExpressionContext,
+  // Note: evaluateExpression and isExpression are exported from './utils'
+  wrapAsExpression,
+} from './components/NDV';
+
 // Stores
 export {
   // Workflow store

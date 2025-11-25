@@ -31,14 +31,14 @@ const sampleWorkflow: Workflow = {
   nodes: [
     {
       id: 'node-1',
-      type: 'manualTrigger',
+      type: 'manual-trigger',
       name: 'Start',
       position: { x: 150, y: 200 },
       parameters: {},
     },
     {
       id: 'node-2',
-      type: 'httpRequest',
+      type: 'http-request',
       name: 'Fetch Data',
       position: { x: 400, y: 200 },
       parameters: {
@@ -66,7 +66,7 @@ const sampleWorkflow: Workflow = {
     },
     {
       id: 'node-4',
-      type: 'setVariable',
+      type: 'set-variable',
       name: 'Transform Data',
       position: { x: 900, y: 150 },
       parameters: {
@@ -76,7 +76,7 @@ const sampleWorkflow: Workflow = {
     },
     {
       id: 'node-5',
-      type: 'noOp',
+      type: 'no-op',
       name: 'Discarded',
       position: { x: 900, y: 300 },
       parameters: {},

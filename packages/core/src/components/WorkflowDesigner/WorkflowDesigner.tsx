@@ -1,4 +1,4 @@
-import React, {
+import {
   memo,
   useCallback,
   useEffect,
@@ -39,7 +39,8 @@ import { useDialogStore } from '../../store/dialog-store';
 import { useThemeStore, initializeTheme } from '../../store/theme-store';
 import { BaseNode, type BaseNodeData } from '../Nodes/BaseNode';
 import { edgeTypes as customEdgeTypes } from '../Edges/CustomEdge';
-import { NodeParametersDialog } from '../Dialogs/NodeParametersDialog';
+import { NodeDetailsView, type InputDataItem } from '../NDV';
+import { executeWorkflow } from '../../engine/executor';
 import type {
   WorkflowDesignerProps,
   WorkflowDesignerRef,
@@ -660,27 +661,132 @@ InnerWorkflowDesigner.displayName = 'InnerWorkflowDesigner';
 const DialogsRenderer = memo(() => {
   const dialogs = useDialogStore((state) => state.dialogs);
   const dialogStore = useDialogStore();
+  const workflowStore = useWorkflowStore();
+  const executionStore = useExecutionStore();
+  const isExecuting = executionStore.isExecuting;
+
+  /**
+   * Run workflow to get real data for the INPUT panel
+   */
+  const handleRunWorkflow = useCallback(async () => {
+    if (isExecuting) return;
+
+    try {
+      // Execute the workflow to populate nodeOutputData
+      await executeWorkflow(workflowStore.workflow, {
+        mode: 'manual',
+        onProgress: (nodeId, status) => {
+          console.log(`[Execution] Node ${nodeId}: ${status}`);
+        },
+      });
+    } catch (error) {
+      console.error('Workflow execution failed:', error);
+    }
+  }, [workflowStore.workflow, isExecuting]);
+
+  /**
+   * Get input data from upstream nodes for expression intellisense
+   * Uses real execution data if available, otherwise shows sample data
+   */
+  const getInputDataForNode = useCallback((nodeId: string): { data: InputDataItem[]; sourceName?: string; hasRealData: boolean } => {
+    // Find incoming edges to this node
+    const incomingEdges = workflowStore.workflow.edges.filter(
+      (edge) => edge.target === nodeId
+    );
+
+    if (incomingEdges.length === 0) {
+      return { data: [], sourceName: undefined, hasRealData: false };
+    }
+
+    // Get the first source node
+    const sourceEdge = incomingEdges[0];
+    const sourceNode = workflowStore.workflow.nodes.find(
+      (n) => n.id === sourceEdge.source
+    );
+
+    if (!sourceNode) {
+      return { data: [], sourceName: undefined, hasRealData: false };
+    }
+
+    // Check if we have real execution data from the source node
+    const realOutputData = executionStore.nodeOutputData[sourceNode.id];
+    if (realOutputData && realOutputData[0] && realOutputData[0].length > 0) {
+      // Get the correct output based on the edge's source handle
+      const outputIndex = sourceEdge.sourceHandle
+        ? parseInt(sourceEdge.sourceHandle.replace('output-', ''), 10)
+        : 0;
+
+      const outputData = realOutputData[outputIndex] ?? realOutputData[0];
+      const inputData: InputDataItem[] = outputData.map((item) => ({
+        json: item.json,
+        binary: item.binary,
+      }));
+
+      return { data: inputData, sourceName: sourceNode.name, hasRealData: true };
+    }
+
+    // Fallback to sample data if no real execution data
+    const sampleData: InputDataItem[] = [
+      {
+        json: {
+          id: 1,
+          name: 'Sample Item 1',
+          email: 'sample@example.com',
+          status: 'active',
+          createdAt: new Date().toISOString(),
+        },
+      },
+      {
+        json: {
+          id: 2,
+          name: 'Sample Item 2',
+          email: 'test@example.com',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        },
+      },
+    ];
+
+    return { data: sampleData, sourceName: sourceNode.name, hasRealData: false };
+  }, [workflowStore.workflow.edges, workflowStore.workflow.nodes, executionStore.nodeOutputData]);
 
   return (
     <>
       {dialogs.map((dialog) => {
         if (dialog.type === DialogType.Parameters) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const config = dialog as any;
+          const { data: inputData, sourceName, hasRealData } = getInputDataForNode(config.node.id);
+
           return (
-            <NodeParametersDialog
+            <NodeDetailsView
               key={dialog.id}
-              id={dialog.id}
               open={true}
               node={config.node}
               nodeType={config.nodeType}
               currentParameters={config.currentParameters}
+              inputData={inputData}
+              sourceNodeName={sourceName}
+              isSampleData={!hasRealData}
               availableCredentials={config.availableCredentials}
-              title={config.title}
-              initialTab={config.initialTab}
-              onSave={config.onSave}
-              onCancel={config.onCancel}
-              onExecute={config.onExecute}
+              onSave={(parameters, settings) => {
+                // Save parameters
+                config.onSave?.(parameters);
+                // Apply settings to node
+                workflowStore.updateNode(config.node.id, {
+                  alwaysOutputData: settings.alwaysOutputData,
+                  executeOnce: settings.executeOnce,
+                  retryOnFail: settings.retryOnFail,
+                  maxTries: settings.maxTries,
+                  waitBetweenTries: settings.waitBetweenTries,
+                  continueOnFail: settings.continueOnFail,
+                  notes: settings.notes,
+                  color: settings.color,
+                });
+              }}
               onClose={() => dialogStore.close(dialog.id)}
+              onExecute={config.onExecute}
+              onRunWorkflow={handleRunWorkflow}
             />
           );
         }
