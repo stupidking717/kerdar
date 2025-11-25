@@ -1,5 +1,6 @@
 import {
   memo,
+  useState,
   useCallback,
   useEffect,
   useRef,
@@ -37,9 +38,12 @@ import { useNodeRegistryStore } from '../../store/node-registry-store';
 import { useExecutionStore } from '../../store/execution-store';
 import { useDialogStore } from '../../store/dialog-store';
 import { useThemeStore, initializeTheme } from '../../store/theme-store';
+import { useSchemaContextStore } from '../../store/schema-context-store';
+import { useCredentialStore } from '../../store/credential-store';
 import { BaseNode, type BaseNodeData } from '../Nodes/BaseNode';
 import { edgeTypes as customEdgeTypes } from '../Edges/CustomEdge';
 import { NodeDetailsView, type InputDataItem } from '../NDV';
+import { CredentialEditor } from '../CredentialEditor';
 import { executeWorkflow } from '../../engine/executor';
 import type {
   WorkflowDesignerProps,
@@ -50,6 +54,10 @@ import type {
   WorkflowViewport,
   Position,
   DialogConfig,
+  CredentialTypeDefinition,
+  Credential,
+  CredentialData,
+  NodeCredential,
 } from '../../types';
 import { DialogType } from '../../types';
 
@@ -670,7 +678,123 @@ const DialogsRenderer = memo(() => {
   const dialogStore = useDialogStore();
   const workflowStore = useWorkflowStore();
   const executionStore = useExecutionStore();
+  const credentialStore = useCredentialStore();
   const isExecuting = executionStore.isExecuting;
+
+  // Credential editor state
+  const [credentialEditorState, setCredentialEditorState] = useState<{
+    isOpen: boolean;
+    credentialType: CredentialTypeDefinition | null;
+    nodeId: string | null;
+    credentialTypeName: string | null;
+  }>({
+    isOpen: false,
+    credentialType: null,
+    nodeId: null,
+    credentialTypeName: null,
+  });
+  const [isSavingCredential, setIsSavingCredential] = useState(false);
+
+  // Get credentials from store
+  const credentials = credentialStore.credentials;
+
+  /**
+   * Get available credentials for a node, organized by credential type
+   */
+  const getAvailableCredentialsForNode = useCallback((nodeType: { credentials?: Array<{ name: string }> }): Record<string, Credential[]> => {
+    if (!nodeType.credentials) return {};
+
+    const result: Record<string, Credential[]> = {};
+    nodeType.credentials.forEach((credConfig) => {
+      result[credConfig.name] = credentials.filter((c) => c.type === credConfig.name);
+    });
+    return result;
+  }, [credentials]);
+
+  /**
+   * Handle credential change for a node
+   */
+  const handleCredentialChange = useCallback((nodeId: string, credentialType: string, credential: NodeCredential | undefined) => {
+    const node = workflowStore.getNode(nodeId);
+    if (!node) return;
+
+    const newCredentials = { ...(node.credentials || {}) };
+    if (credential) {
+      newCredentials[credentialType] = credential;
+    } else {
+      delete newCredentials[credentialType];
+    }
+
+    workflowStore.updateNode(nodeId, { credentials: newCredentials });
+  }, [workflowStore]);
+
+  /**
+   * Handle create new credential request
+   */
+  const handleCreateCredential = useCallback((nodeId: string, credentialTypeName: string) => {
+    const credentialType = credentialStore.getCredentialType(credentialTypeName);
+    if (!credentialType) {
+      console.error(`Credential type not found: ${credentialTypeName}`);
+      return;
+    }
+
+    setCredentialEditorState({
+      isOpen: true,
+      credentialType,
+      nodeId,
+      credentialTypeName,
+    });
+  }, [credentialStore]);
+
+  /**
+   * Handle save credential
+   */
+  const handleSaveCredential = useCallback(async (name: string, data: CredentialData) => {
+    const { credentialType, nodeId, credentialTypeName } = credentialEditorState;
+    if (!credentialType) return;
+
+    setIsSavingCredential(true);
+    try {
+      // Add the new credential
+      const newCredential = await credentialStore.addCredential({
+        name,
+        type: credentialType.name,
+        data,
+      });
+
+      // Automatically select it for the node
+      if (nodeId && credentialTypeName) {
+        handleCredentialChange(nodeId, credentialTypeName, {
+          id: newCredential.id,
+          name: newCredential.name,
+        });
+      }
+
+      // Close the editor
+      setCredentialEditorState({
+        isOpen: false,
+        credentialType: null,
+        nodeId: null,
+        credentialTypeName: null,
+      });
+    } catch (error) {
+      console.error('Failed to save credential:', error);
+    } finally {
+      setIsSavingCredential(false);
+    }
+  }, [credentialEditorState, credentialStore, handleCredentialChange]);
+
+  /**
+   * Handle close credential editor
+   */
+  const handleCloseCredentialEditor = useCallback(() => {
+    setCredentialEditorState({
+      isOpen: false,
+      credentialType: null,
+      nodeId: null,
+      credentialTypeName: null,
+    });
+  }, []);
 
   /**
    * Run workflow to get real data for the INPUT panel
@@ -693,7 +817,7 @@ const DialogsRenderer = memo(() => {
 
   /**
    * Get input data from upstream nodes for expression intellisense
-   * Uses real execution data if available, otherwise shows sample data
+   * Uses real execution data if available, otherwise generates from schema
    */
   const getInputDataForNode = useCallback((nodeId: string): { data: InputDataItem[]; sourceName?: string; hasRealData: boolean } => {
     // Find incoming edges to this node
@@ -732,29 +856,22 @@ const DialogsRenderer = memo(() => {
       return { data: inputData, sourceName: sourceNode.name, hasRealData: true };
     }
 
-    // Fallback to sample data if no real execution data
-    const sampleData: InputDataItem[] = [
-      {
-        json: {
-          id: 1,
-          name: 'Sample Item 1',
-          email: 'sample@example.com',
-          status: 'active',
-          createdAt: new Date().toISOString(),
-        },
-      },
-      {
-        json: {
-          id: 2,
-          name: 'Sample Item 2',
-          email: 'test@example.com',
-          status: 'pending',
-          createdAt: new Date().toISOString(),
-        },
-      },
-    ];
+    // Use schema context to generate mock data based on upstream node's output schema
+    const schemaStore = useSchemaContextStore.getState();
+    const schemaContext = schemaStore.getSchemaContext(nodeId);
 
-    return { data: sampleData, sourceName: sourceNode.name, hasRealData: false };
+    if (schemaContext && schemaContext.inputSchemas.length > 0) {
+      // We have schema info from upstream node(s)
+      const mockData = schemaStore.getMockData(nodeId);
+      if (mockData && Object.keys(mockData).length > 0) {
+        const schemaBasedData: InputDataItem[] = [{ json: mockData }];
+        return { data: schemaBasedData, sourceName: sourceNode.name, hasRealData: false };
+      }
+    }
+
+    // No schema available - return empty data with message
+    // The UI should show "No input data" and suggest running the workflow
+    return { data: [], sourceName: sourceNode.name, hasRealData: false };
   }, [workflowStore.workflow.edges, workflowStore.workflow.nodes, executionStore.nodeOutputData]);
 
   return (
@@ -764,6 +881,7 @@ const DialogsRenderer = memo(() => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const config = dialog as any;
           const { data: inputData, sourceName, hasRealData } = getInputDataForNode(config.node.id);
+          const availableCredentials = getAvailableCredentialsForNode(config.nodeType);
 
           return (
             <NodeDetailsView
@@ -775,12 +893,22 @@ const DialogsRenderer = memo(() => {
               inputData={inputData}
               sourceNodeName={sourceName}
               isSampleData={!hasRealData}
-              availableCredentials={config.availableCredentials}
+              availableCredentials={availableCredentials}
+              onCredentialChange={(credentialType, credential) => {
+                handleCredentialChange(config.node.id, credentialType, credential);
+              }}
+              onCreateCredential={(credentialType) => {
+                handleCreateCredential(config.node.id, credentialType);
+              }}
+              onNameChange={(newName) => {
+                workflowStore.updateNode(config.node.id, { name: newName });
+              }}
               onSave={(parameters, settings) => {
                 // Save parameters
                 config.onSave?.(parameters);
                 // Apply settings to node
                 workflowStore.updateNode(config.node.id, {
+                  name: settings.name,
                   alwaysOutputData: settings.alwaysOutputData,
                   executeOnce: settings.executeOnce,
                   retryOnFail: settings.retryOnFail,
@@ -802,6 +930,16 @@ const DialogsRenderer = memo(() => {
 
         return null;
       })}
+
+      {/* Credential Editor Modal */}
+      {credentialEditorState.isOpen && credentialEditorState.credentialType && (
+        <CredentialEditor
+          credentialType={credentialEditorState.credentialType}
+          onSave={handleSaveCredential}
+          onClose={handleCloseCredentialEditor}
+          isSaving={isSavingCredential}
+        />
+      )}
     </>
   );
 });

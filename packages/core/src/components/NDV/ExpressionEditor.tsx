@@ -568,12 +568,21 @@ ExpressionEditor.displayName = 'ExpressionEditor';
  * Supports {{ expression }} syntax
  */
 export function evaluateExpression(expression: string, context: ExpressionContext): unknown {
-  // Extract expression from {{ }} if present
+  // Extract expression from {{ }} or ={{ }} if present
   let expr = expression.trim();
-  if (expr.startsWith('{{') && expr.endsWith('}}')) {
+
+  // Handle n8n-style ={{ ... }} format (strip = and braces)
+  if (expr.startsWith('={{') && expr.endsWith('}}')) {
+    expr = expr.slice(3, -2).trim();
+  } else if (expr.startsWith('{{') && expr.endsWith('}}')) {
     expr = expr.slice(2, -2).trim();
   } else if (expr.startsWith('=')) {
+    // Handle = prefix for inline expressions
     expr = expr.slice(1).trim();
+    // If there are still {{ }}, strip them
+    if (expr.startsWith('{{') && expr.endsWith('}}')) {
+      expr = expr.slice(2, -2).trim();
+    }
   }
 
   if (!expr) return undefined;

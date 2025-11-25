@@ -2,6 +2,7 @@ import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import { Code, Type, Check, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { ExpressionEditor, isExpression, wrapAsExpression, type ExpressionContext } from './ExpressionEditor';
+import { ConditionBuilder, type Condition } from './ConditionBuilder';
 import { CodeEditor } from '../ui/CodeEditor';
 import {
   Select,
@@ -11,7 +12,7 @@ import {
   SelectValue,
 } from '../ui/Select';
 import type { NodeProperty } from '../../types';
-import { PropertyType } from '../../types';
+import { PropertyType, ComparisonOperation, CombineConditionMode } from '../../types';
 
 /**
  * Props for ParameterInput
@@ -27,6 +28,10 @@ export interface ParameterInputProps {
   expressionContext?: ExpressionContext;
   /** Node ID for schema-aware autocomplete */
   nodeId?: string;
+  /** All parameter values (for condition builder to access combineConditions) */
+  allValues?: Record<string, unknown>;
+  /** Callback to change another parameter (for condition builder to update combineConditions) */
+  onOtherParameterChange?: (name: string, value: unknown) => void;
   /** Whether the field is being dragged over */
   isDragOver?: boolean;
   /** Called when drag enters the field */
@@ -49,6 +54,8 @@ export const ParameterInput = memo<ParameterInputProps>(({
   onChange,
   expressionContext,
   nodeId,
+  allValues,
+  onOtherParameterChange,
   isDragOver,
   onDragEnter,
   onDragLeave,
@@ -60,6 +67,8 @@ export const ParameterInput = memo<ParameterInputProps>(({
   // Determine if current value is an expression
   const [expressionMode, setExpressionMode] = useState(() => isExpression(value));
   const dropRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [cursorPosition, setCursorPosition] = useState<number | null>(null);
 
   // Update expression mode when value changes
   useEffect(() => {
@@ -116,15 +125,54 @@ export const ParameterInput = memo<ParameterInputProps>(({
       const data = e.dataTransfer.getData('application/kerdar-expression');
       if (data) {
         const { path } = JSON.parse(data);
-        // Set to expression mode and create expression from path
+
+        // For JSON type, insert at cursor position wrapped as expression
+        if (type === PropertyType.Json) {
+          const currentValue = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+          const expressionValue = wrapAsExpression(path);
+
+          // Get cursor position from textarea ref or use stored position
+          const position = textareaRef.current?.selectionStart ?? cursorPosition ?? currentValue.length;
+
+          // Insert expression at cursor position
+          const before = currentValue.substring(0, position);
+          const after = currentValue.substring(position);
+          const newValue = before + expressionValue + after;
+
+          try {
+            onChange(JSON.parse(newValue));
+          } catch {
+            onChange(newValue);
+          }
+          onDrop?.(path);
+          return;
+        }
+
         setExpressionMode(true);
-        onChange(wrapAsExpression(path));
+
+        // If there's already an expression value, append with + operator
+        const currentValue = typeof value === 'string' ? value.trim() : '';
+        if (currentValue && isExpression(currentValue)) {
+          // Extract content inside {{ }} and append new path
+          const match = currentValue.match(/^\{\{\s*(.*?)\s*\}\}$/);
+          if (match) {
+            const existingExpr = match[1];
+            // Append with + operator
+            onChange(`{{ ${existingExpr} + ${path} }}`);
+          } else {
+            // Fallback: just append after existing expression
+            onChange(wrapAsExpression(path));
+          }
+        } else {
+          // No existing expression, create new one
+          onChange(wrapAsExpression(path));
+        }
         onDrop?.(path);
       }
     } catch (err) {
       console.error('Failed to handle drop:', err);
     }
-  }, [onChange, onDrop, onDragLeave]);
+  }, [type, value, cursorPosition, onChange, onDrop, onDragLeave]);
 
   // Common field wrapper classes
   const fieldWrapperClasses = cn(
@@ -218,30 +266,36 @@ export const ParameterInput = memo<ParameterInputProps>(({
 
       case PropertyType.Boolean:
         return (
-          <label className="flex items-center gap-3 cursor-pointer">
-            <div className="relative">
-              <input
-                type="checkbox"
-                id={name}
-                checked={(value as boolean) ?? false}
-                onChange={(e) => onChange(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className={cn(
-                'w-10 h-6 bg-gray-200 dark:bg-slate-600 rounded-full',
-                'peer-checked:bg-blue-500',
-                'transition-colors'
-              )} />
-              <div className={cn(
-                'absolute left-1 top-1 w-4 h-4 bg-white rounded-full',
-                'peer-checked:translate-x-4',
-                'transition-transform shadow-sm'
-              )} />
-            </div>
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              {value ? 'True' : 'False'}
-            </span>
-          </label>
+          <div className="flex items-center justify-between py-1">
+            <label
+              htmlFor={name}
+              className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+            >
+              {displayName}
+              {required && <span className="text-red-500 ml-0.5">*</span>}
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  id={name}
+                  checked={(value as boolean) ?? false}
+                  onChange={(e) => onChange(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className={cn(
+                  'w-10 h-6 bg-gray-200 dark:bg-slate-600 rounded-full',
+                  'peer-checked:bg-blue-500',
+                  'transition-colors'
+                )} />
+                <div className={cn(
+                  'absolute left-1 top-1 w-4 h-4 bg-white rounded-full',
+                  'peer-checked:translate-x-4',
+                  'transition-transform shadow-sm'
+                )} />
+              </div>
+            </label>
+          </div>
         );
 
       case PropertyType.Options:
@@ -357,6 +411,37 @@ export const ParameterInput = memo<ParameterInputProps>(({
         );
 
       case PropertyType.FixedCollection:
+        // Check if this is a conditions property for IF node
+        if (isConditionsProperty(property)) {
+          // Extract conditions array from the FixedCollection value structure
+          // The IF node uses 'conditions' key, but standard FixedCollection uses 'parameters'
+          const fixedValue = value as Record<string, unknown[]> | undefined;
+          const rawConditions = fixedValue?.conditions || fixedValue?.parameters || [];
+          const conditionsArray = rawConditions as unknown as Condition[];
+
+          // Get combineMode from allValues
+          const combineMode = (allValues?.combineConditions as CombineConditionMode) || CombineConditionMode.And;
+
+          return (
+            <ConditionBuilder
+              conditions={conditionsArray.length > 0 ? conditionsArray : [
+                { value1: '', operation: ComparisonOperation.Equals, value2: '' }
+              ]}
+              combineMode={combineMode}
+              onConditionsChange={(newConditions) => {
+                // Use 'conditions' key to match the IF node structure
+                onChange({ conditions: newConditions });
+              }}
+              onCombineModeChange={(newMode) => {
+                onOtherParameterChange?.('combineConditions', newMode);
+              }}
+              enableGroups={true}
+              expressionContext={expressionContext}
+              nodeId={nodeId}
+            />
+          );
+        }
+
         return (
           <FixedCollectionInput
             property={property}
@@ -619,6 +704,28 @@ function formatValueForInput(v: unknown): string {
   if (Array.isArray(v)) return JSON.stringify(v);
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
+}
+
+/**
+ * Check if a FixedCollection property is for n8n-style conditions
+ * by examining the property name and child structure
+ */
+function isConditionsProperty(property: NodeProperty): boolean {
+  // Check by property name
+  if (property.name === 'conditions') {
+    // Verify it has the expected condition child properties
+    const childProps = property.values;
+    if (childProps && childProps.length >= 2) {
+      const propNames = childProps.map((p) => p.name);
+      // Must have at least value1 and operation
+      if (propNames.includes('value1') && propNames.includes('operation')) {
+        return true;
+      }
+    }
+    // If it's named conditions, use it anyway
+    return true;
+  }
+  return false;
 }
 
 /**

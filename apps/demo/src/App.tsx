@@ -7,6 +7,7 @@ import {
   useWorkflowStore,
   useExecutionStore,
   useNodeRegistryStore,
+  useCredentialStore,
   useThemeMode,
   useThemeActions,
   type Workflow,
@@ -22,42 +23,52 @@ import {
 import {
   standardNodes,
   registerStandardNodes,
+  standardCredentialTypes,
 } from '@kerdar/nodes-standard';
 
-// Sample workflow for demonstration
+// Sample workflow demonstrating schema binding and expressions
 const sampleWorkflow: Workflow = {
   id: 'demo-workflow-1',
-  name: 'Sample API Workflow',
+  name: 'Schema Demo Workflow',
   nodes: [
     {
       id: 'node-1',
-      type: 'manual-trigger',
-      name: 'Start',
-      position: { x: 150, y: 200 },
-      parameters: {},
+      type: 'webhook-trigger',
+      name: 'Receive Webhook',
+      position: { x: 100, y: 200 },
+      parameters: {
+        path: '/api/users',
+        method: 'POST',
+        responseMode: 'onReceived',
+        responseCode: 200,
+      },
     },
     {
       id: 'node-2',
       type: 'http-request',
-      name: 'Fetch Data',
-      position: { x: 400, y: 200 },
+      name: 'Enrich User Data',
+      position: { x: 350, y: 200 },
       parameters: {
-        url: 'https://jsonplaceholder.typicode.com/posts',
+        url: '{{ "https://api.example.com/users/" + $json.body.userId }}',
         method: 'GET',
+        authentication: 'apiKey',
+        apiKeyName: 'X-API-Key',
+        apiKeyValue: '{{ $env.API_KEY }}',
+        apiKeyLocation: 'header',
       },
     },
     {
       id: 'node-3',
       type: 'if',
-      name: 'Filter Posts',
-      position: { x: 650, y: 200 },
+      name: 'Check Status',
+      position: { x: 600, y: 200 },
       parameters: {
         conditions: {
           conditions: [
             {
-              value1: '={{ $json.userId }}',
+              value1: '{{ $json.status }}',
               operation: 'equals',
-              value2: '1',
+              value2: 'active',
             },
           ],
         },
@@ -66,20 +77,32 @@ const sampleWorkflow: Workflow = {
     },
     {
       id: 'node-4',
-      type: 'set-variable',
-      name: 'Transform Data',
-      position: { x: 900, y: 150 },
+      type: 'http-request',
+      name: 'Send Notification',
+      position: { x: 850, y: 150 },
       parameters: {
-        mode: 'keep',
-        fields: 'id, title',
+        url: 'https://api.slack.com/api/chat.postMessage',
+        method: 'POST',
+        authentication: 'bearerToken',
+        bearerToken: '{{ $env.SLACK_TOKEN }}',
+        sendBody: true,
+        bodyContentType: 'json',
+        body: '{\n  "channel": "#notifications",\n  "text": "User {{ $json.name }} is now active!"\n}',
       },
     },
     {
       id: 'node-5',
-      type: 'no-op',
-      name: 'Discarded',
-      position: { x: 900, y: 300 },
-      parameters: {},
+      type: 'set-variable',
+      name: 'Archive User',
+      position: { x: 850, y: 300 },
+      parameters: {
+        mode: 'manual',
+        fields: [
+          { name: 'userId', value: '{{ $json.id }}' },
+          { name: 'archivedAt', value: '{{ $now.toISOString() }}' },
+          { name: 'reason', value: 'inactive_status' },
+        ],
+      },
     },
   ],
   edges: [
@@ -139,14 +162,20 @@ function App() {
   const { setWorkflow, workflow, addNode } = useWorkflowStore();
   const { isExecuting, startExecution, cancelExecution } = useExecutionStore();
   const { createNodeInstance, getNodeType } = useNodeRegistryStore();
+  const { registerCredentialTypes } = useCredentialStore();
   const mode = useThemeMode();
   const { setMode } = useThemeActions();
 
-  // Register standard nodes on mount
+  // Register standard nodes and credential types on mount
   useEffect(() => {
+    // Register all node types
     registerStandardNodes((node) => registerNodes([node]));
+
+    // Register all credential types
+    registerCredentialTypes(standardCredentialTypes);
+
     setIsReady(true);
-  }, []);
+  }, [registerCredentialTypes]);
 
   // Load sample workflow
   useEffect(() => {

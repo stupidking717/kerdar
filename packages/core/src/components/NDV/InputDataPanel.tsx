@@ -1,6 +1,7 @@
 import { memo, useState, useCallback, useMemo } from 'react';
-import { Table, Code, GitBranch, ChevronRight, ChevronDown, GripVertical, Play, AlertCircle } from 'lucide-react';
+import { Table, Code, GitBranch, ChevronRight, ChevronDown, GripVertical, Play, AlertCircle, Database } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import type { DataSchema, SchemaProperty } from '../../types';
 
 /**
  * Input data item structure
@@ -23,6 +24,8 @@ export interface InputDataPanelProps {
   hasData: boolean;
   /** Whether showing sample/mock data instead of real execution data */
   isSampleData?: boolean;
+  /** Schema from connected input node (shown when no data available) */
+  inputSchema?: DataSchema;
   /** Called when user wants to run the workflow to get data */
   onRunWorkflow?: () => void;
   /** Called when a field is dragged */
@@ -44,6 +47,7 @@ export const InputDataPanel = memo<InputDataPanelProps>(({
   sourceNodeName,
   hasData,
   isSampleData = false,
+  inputSchema,
   onRunWorkflow,
   onDragStart,
   viewMode: initialViewMode = 'table',
@@ -64,6 +68,54 @@ export const InputDataPanel = memo<InputDataPanelProps>(({
   }, [onDragStart]);
 
   if (!hasData) {
+    // If we have an input schema, show it instead of the empty state
+    if (inputSchema && inputSchema.properties && Object.keys(inputSchema.properties).length > 0) {
+      return (
+        <div className={cn('flex flex-col h-full bg-gray-50 dark:bg-slate-900', className)}>
+          <PanelHeader
+            title="INPUT"
+            sourceNodeName={sourceNodeName}
+            viewMode="schema"
+            onViewModeChange={() => {}} // Schema only when no data
+          />
+          {/* Schema available banner */}
+          <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs text-blue-700 dark:text-blue-400">
+              <Database className="w-3.5 h-3.5" />
+              <span>Showing expected input schema from connected node</span>
+            </div>
+            {onRunWorkflow && (
+              <button
+                onClick={onRunWorkflow}
+                disabled={isLoading}
+                className={cn(
+                  'flex items-center gap-1 px-2 py-1 rounded text-xs font-medium',
+                  'bg-blue-500 hover:bg-blue-600 text-white',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                  'transition-colors'
+                )}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3 h-3" />
+                    Run
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          <div className="flex-1 overflow-auto">
+            <InputSchemaView schema={inputSchema} onDragStart={handleDragStart} />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className={cn('flex flex-col h-full bg-gray-50 dark:bg-slate-900', className)}>
         <PanelHeader
@@ -575,6 +627,148 @@ function formatValue(value: unknown): string {
   if (Array.isArray(value)) return `[${value.length} items]`;
   if (typeof value === 'object') return '{...}';
   return String(value);
+}
+
+/**
+ * Input schema view - shows schema from connected node's output schema
+ */
+interface InputSchemaViewProps {
+  schema: DataSchema;
+  onDragStart: (path: string, value: unknown) => (e: React.DragEvent) => void;
+  parentPath?: string;
+}
+
+function InputSchemaView({ schema, onDragStart, parentPath = '$json' }: InputSchemaViewProps) {
+  return (
+    <div className="p-3">
+      <DataSchemaTree
+        properties={schema.properties}
+        onDragStart={onDragStart}
+        path={parentPath}
+        level={0}
+      />
+    </div>
+  );
+}
+
+interface DataSchemaTreeProps {
+  properties: Record<string, SchemaProperty>;
+  onDragStart: (path: string, value: unknown) => (e: React.DragEvent) => void;
+  path: string;
+  level: number;
+}
+
+function DataSchemaTree({ properties, onDragStart, path, level }: DataSchemaTreeProps) {
+  const typeColors: Record<string, string> = {
+    string: 'text-green-600 dark:text-green-400',
+    number: 'text-blue-600 dark:text-blue-400',
+    integer: 'text-blue-600 dark:text-blue-400',
+    boolean: 'text-purple-600 dark:text-purple-400',
+    null: 'text-gray-400',
+    array: 'text-amber-600 dark:text-amber-400',
+    object: 'text-pink-600 dark:text-pink-400',
+  };
+
+  const entries = Object.entries(properties);
+
+  return (
+    <div className={cn(level > 0 && 'ml-4 border-l border-gray-200 dark:border-gray-700 pl-2')}>
+      {entries.map(([key, prop]) => {
+        const propPath = `${path}.${key}`;
+
+        return (
+          <SchemaPropertyRow
+            key={key}
+            name={key}
+            property={prop}
+            path={propPath}
+            level={level}
+            onDragStart={onDragStart}
+            typeColors={typeColors}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+interface SchemaPropertyRowProps {
+  name: string;
+  property: SchemaProperty;
+  path: string;
+  level: number;
+  onDragStart: (path: string, value: unknown) => (e: React.DragEvent) => void;
+  typeColors: Record<string, string>;
+}
+
+function SchemaPropertyRow({ name, property, path, level, onDragStart, typeColors }: SchemaPropertyRowProps) {
+  const [expanded, setExpanded] = useState(level < 2);
+
+  const propType = Array.isArray(property.type) ? property.type[0] : property.type;
+  const isObject = propType === 'object' && property.properties;
+  const isArray = propType === 'array' && property.items;
+  const isExpandable = isObject || isArray;
+
+  return (
+    <div className="py-0.5">
+      <div
+        draggable
+        onDragStart={onDragStart(path, null)}
+        className="hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-grab flex items-center gap-2 py-0.5 px-1 rounded"
+      >
+        <GripVertical className="w-3 h-3 text-gray-300" />
+        {isExpandable && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          </button>
+        )}
+        <span className="text-gray-700 dark:text-gray-300 font-mono text-xs">{name}</span>
+        {property.required && <span className="text-red-500 text-xs">*</span>}
+        <span className="text-gray-400">:</span>
+        <span className={cn('text-xs', typeColors[propType] || 'text-gray-400')}>
+          {propType}
+          {isArray && property.items && (
+            <>
+              <span className="text-gray-400">&lt;</span>
+              {Array.isArray(property.items.type) ? property.items.type[0] : property.items.type}
+              <span className="text-gray-400">&gt;</span>
+            </>
+          )}
+        </span>
+        {property.example !== undefined && (
+          <span className="text-gray-400 ml-2 text-xs">
+            (e.g., {formatValue(property.example)})
+          </span>
+        )}
+      </div>
+
+      {/* Nested properties for objects */}
+      {isObject && expanded && property.properties && (
+        <DataSchemaTree
+          properties={property.properties}
+          onDragStart={onDragStart}
+          path={path}
+          level={level + 1}
+        />
+      )}
+
+      {/* Array item properties */}
+      {isArray && expanded && property.items?.properties && (
+        <DataSchemaTree
+          properties={property.items.properties}
+          onDragStart={onDragStart}
+          path={`${path}[0]`}
+          level={level + 1}
+        />
+      )}
+    </div>
+  );
 }
 
 export default InputDataPanel;

@@ -21,6 +21,9 @@ export { NodeSidebar, type NodeSidebarProps } from './components/NodeSidebar';
 // Execution History
 export { ExecutionHistory, type ExecutionHistoryProps, type ExecutionRecord } from './components/ExecutionHistory';
 
+// Credential Editor
+export { CredentialEditor, type CredentialEditorProps } from './components/CredentialEditor';
+
 // NDV (Node Details View) components
 export {
   NodeDetailsView,

@@ -38,6 +38,8 @@ export interface NodeDetailsViewProps {
   onCredentialChange?: (credentialType: string, credential: NodeCredential | undefined) => void;
   /** Called when user wants to create new credential */
   onCreateCredential?: (credentialType: string) => void;
+  /** Called when node name changes */
+  onNameChange?: (newName: string) => void;
   /** Called when parameters are saved */
   onSave?: (parameters: Record<string, unknown>, settings: NodeSettings) => void;
   /** Called when cancel/close is clicked */
@@ -54,6 +56,7 @@ export interface NodeDetailsViewProps {
  * Node settings
  */
 interface NodeSettings {
+  name: string;
   alwaysOutputData: boolean;
   executeOnce: boolean;
   retryOnFail: boolean;
@@ -78,6 +81,7 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
   availableCredentials = {},
   onCredentialChange,
   onCreateCredential,
+  onNameChange,
   onSave,
   onClose,
   onExecute,
@@ -98,6 +102,7 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
 
   // Settings state
   const [settings, setSettings] = useState<NodeSettings>({
+    name: node.name,
     alwaysOutputData: node.alwaysOutputData ?? false,
     executeOnce: node.executeOnce ?? false,
     retryOnFail: node.retryOnFail ?? false,
@@ -117,6 +122,7 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
   useEffect(() => {
     setParameters({ ...currentParameters });
     setSettings({
+      name: node.name,
       alwaysOutputData: node.alwaysOutputData ?? false,
       executeOnce: node.executeOnce ?? false,
       retryOnFail: node.retryOnFail ?? false,
@@ -325,7 +331,7 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
                 {/* Node Name */}
                 <div>
                   <h2 className="font-semibold text-gray-900 dark:text-gray-100">
-                    {node.name}
+                    {settings.name || node.name}
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {nodeType.displayName}
@@ -484,6 +490,8 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
                           onChange={(value) => handleParameterChange(property.name, value)}
                           expressionContext={expressionContext}
                           nodeId={node.id}
+                          allValues={parameters}
+                          onOtherParameterChange={handleParameterChange}
                           isDragOver={dragOverField === property.name}
                           onDragEnter={() => setDragOverField(property.name)}
                           onDragLeave={() => setDragOverField(null)}
@@ -495,6 +503,37 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
 
                   {/* Settings Tab */}
                   <Tabs.Content value="settings" className="flex-1 min-h-0 overflow-auto p-4 space-y-4">
+                    {/* Node Name */}
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Node Name
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.name}
+                        onChange={(e) => {
+                          handleSettingsChange('name', e.target.value);
+                          // Call onNameChange immediately for real-time update
+                          if (e.target.value.trim()) {
+                            onNameChange?.(e.target.value.trim());
+                          }
+                        }}
+                        className={cn(
+                          'w-full px-3 py-2 rounded-lg text-sm',
+                          'border border-gray-300 dark:border-slate-600',
+                          'bg-white dark:bg-slate-700',
+                          'text-gray-900 dark:text-gray-100',
+                          'focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        )}
+                        placeholder="Enter node name..."
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        A unique name for this node in the workflow
+                      </p>
+                    </div>
+
+                    <div className="border-t border-gray-200 dark:border-slate-700 pt-4" />
+
                     <SettingsToggle
                       label="Always Output Data"
                       description="Output data even if the node fails or returns empty data"
