@@ -343,15 +343,20 @@ export const ParameterInput = memo<ParameterInputProps>(({
       case PropertyType.Json:
         return (
           <textarea
+            ref={textareaRef}
             id={name}
             value={typeof value === 'string' ? value : JSON.stringify(value, null, 2)}
             onChange={(e) => {
+              setCursorPosition(e.target.selectionStart);
               try {
                 onChange(JSON.parse(e.target.value));
               } catch {
                 onChange(e.target.value);
               }
             }}
+            onSelect={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
+            onClick={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
+            onKeyUp={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)}
             placeholder={placeholder || '{\n  \n}'}
             rows={6}
             className={cn(inputClasses, 'font-mono text-xs resize-y')}
