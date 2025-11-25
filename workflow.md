@@ -38,6 +38,17 @@ Create a production-ready, open-source React workflow designer library using Rea
 - [x] Real-time expression preview
 - [x] Nested property autocomplete in expressions
 
+#### Input/Output Schema System
+- [x] Schema type system (`DataSchema`, `SchemaProperty`, `SchemaSuggestion`)
+- [x] Schema builder helpers (`stringProperty()`, `numberProperty()`, `objectProperty()`, etc.)
+- [x] Static and dynamic schema definitions on nodes (`outputSchema`)
+- [x] Schema context tracking with BFS graph traversal
+- [x] Schema-aware expression editor autocomplete
+- [x] Visual indicator when schema context available
+- [x] Workflow simulation engine with mock data generation
+- [x] `simulateWorkflow()` for testing without real API calls
+- [x] `previewSimulationDataFlow()` for data flow visualization
+
 #### Node System
 - [x] Node type registration system
 - [x] Category-based organization
@@ -125,8 +136,20 @@ Create a production-ready, open-source React workflow designer library using Rea
 - [x] Button component with variants
 
 ### Pending Features
+
+#### High Priority
+- [ ] n8n-style condition builder (exact match)
+- [ ] Execute Workflow node with async callback data fetching
+- [ ] JSON editor expression drop at cursor position fix
+- [ ] Proper Lock, Parallel, Sequence node implementations
+
+#### Medium Priority
 - [ ] Credential storage integration
 - [ ] Workflow templates
+- [ ] Node authentication audit and fixes
+- [ ] Example workflow demonstrating schema binding
+
+#### Low Priority
 - [ ] Undo/redo history persistence
 - [ ] Workflow import/export UI
 - [ ] Node search (Cmd+K)

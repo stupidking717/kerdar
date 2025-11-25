@@ -478,6 +478,132 @@ function App() {
 }
 ```
 
+## Schema System
+
+KERDAR includes a powerful schema system that enables type-safe data flow between nodes with intelligent autocomplete in the expression editor.
+
+### Defining Output Schemas
+
+Add output schemas to your custom nodes for intelligent autocomplete:
+
+```tsx
+import {
+  registerNode,
+  createSchema,
+  stringProperty,
+  numberProperty,
+  objectProperty,
+  type DataSchema,
+  type NodeTypeDefinition,
+} from '@kerdar/core';
+
+// Static schema
+const outputSchema: DataSchema = createSchema({
+  userId: stringProperty({ description: 'User identifier' }),
+  name: stringProperty({ description: 'User full name' }),
+  email: stringProperty({ format: 'email' }),
+  age: numberProperty({ description: 'User age' }),
+  metadata: objectProperty({
+    createdAt: stringProperty({ format: 'date-time' }),
+    updatedAt: stringProperty({ format: 'date-time' }),
+  }),
+});
+
+const UserLookupNode: NodeTypeDefinition = {
+  type: 'user-lookup',
+  // ... other properties
+  outputSchema, // Static schema
+  async execute(context) {
+    // Node implementation
+  },
+};
+```
+
+### Dynamic Schemas
+
+For nodes whose output depends on parameters (like HTTP Request):
+
+```tsx
+import { type DynamicSchemaFn } from '@kerdar/core';
+
+const dynamicOutputSchema: DynamicSchemaFn = (params, node) => {
+  const includeMetadata = params.includeMetadata as boolean;
+
+  if (includeMetadata) {
+    return createSchema({
+      data: anyProperty(),
+      metadata: objectProperty({
+        statusCode: numberProperty(),
+        headers: objectProperty({}, { additionalProperties: stringProperty() }),
+      }),
+    });
+  }
+
+  return createSchema({
+    data: anyProperty(),
+  });
+};
+
+const MyNode: NodeTypeDefinition = {
+  // ...
+  outputSchema: dynamicOutputSchema,
+};
+```
+
+### Using Schema Context
+
+Access schema-based suggestions programmatically:
+
+```tsx
+import {
+  useSchemaContext,
+  useSchemaSuggestions,
+  useMockData,
+  getSchemaExpressionVariables,
+} from '@kerdar/core';
+
+function MyComponent({ nodeId }: { nodeId: string }) {
+  // Get full schema context (all upstream schemas)
+  const context = useSchemaContext(nodeId);
+
+  // Get autocomplete suggestions
+  const suggestions = useSchemaSuggestions(nodeId);
+
+  // Get mock data for simulation
+  const mockData = useMockData(nodeId);
+
+  // Get organized expression variables
+  const variables = getSchemaExpressionVariables(nodeId);
+  // Returns: { json: [...], input: [...], nodes: {...}, builtIn: [...] }
+}
+```
+
+### Workflow Simulation
+
+Test workflows without making real API calls:
+
+```tsx
+import { simulateWorkflow, previewSimulationDataFlow } from '@kerdar/core';
+
+// Simulate full workflow execution with mock data
+const result = await simulateWorkflow(workflow, {
+  nodeDelay: 500, // Delay between nodes for visualization
+  mockDataOverrides: {
+    'node-1': { customData: 'override' },
+  },
+  onProgress: (nodeId, status, data) => {
+    console.log(`${nodeId}: ${status}`, data);
+  },
+  onDataFlow: (source, target, data) => {
+    console.log(`Data flowing from ${source} to ${target}`);
+  },
+});
+
+// Preview data flow without execution
+const dataFlow = previewSimulationDataFlow(workflow);
+// Returns Map<nodeId, { input: [...], output: [...] }>
+```
+
 ## API Reference
 
 ### Main Components
