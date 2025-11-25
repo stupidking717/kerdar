@@ -165,10 +165,84 @@ export const HttpRequestNode: NodeTypeDefinition = {
       options: [
         { name: 'None', value: AuthenticationType.None },
         { name: 'Basic Auth', value: AuthenticationType.BasicAuth },
+        { name: 'API Key', value: AuthenticationType.ApiKey },
         { name: 'Header Auth', value: AuthenticationType.HeaderAuth },
         { name: 'Bearer Token', value: AuthenticationType.BearerToken },
       ],
     },
+    // Basic Auth fields
+    {
+      name: 'basicAuthUser',
+      displayName: 'Username',
+      type: PropertyType.String,
+      default: '',
+      description: 'Username for Basic Authentication',
+      displayOptions: {
+        show: {
+          authentication: [AuthenticationType.BasicAuth],
+        },
+      },
+    },
+    {
+      name: 'basicAuthPassword',
+      displayName: 'Password',
+      type: PropertyType.String,
+      default: '',
+      typeOptions: {
+        password: true,
+      },
+      description: 'Password for Basic Authentication',
+      displayOptions: {
+        show: {
+          authentication: [AuthenticationType.BasicAuth],
+        },
+      },
+    },
+    // API Key fields
+    {
+      name: 'apiKeyName',
+      displayName: 'API Key Name',
+      type: PropertyType.String,
+      default: 'X-API-Key',
+      description: 'Name of the header or query parameter to send the API key',
+      displayOptions: {
+        show: {
+          authentication: [AuthenticationType.ApiKey],
+        },
+      },
+    },
+    {
+      name: 'apiKeyValue',
+      displayName: 'API Key Value',
+      type: PropertyType.String,
+      default: '',
+      typeOptions: {
+        password: true,
+      },
+      description: 'The API key value',
+      displayOptions: {
+        show: {
+          authentication: [AuthenticationType.ApiKey],
+        },
+      },
+    },
+    {
+      name: 'apiKeyLocation',
+      displayName: 'Send API Key In',
+      type: PropertyType.Options,
+      default: 'header',
+      options: [
+        { name: 'Header', value: 'header' },
+        { name: 'Query String', value: 'query' },
+      ],
+      description: 'Where to send the API key',
+      displayOptions: {
+        show: {
+          authentication: [AuthenticationType.ApiKey],
+        },
+      },
+    },
+    // Bearer Token field
     {
       name: 'bearerToken',
       displayName: 'Bearer Token',
@@ -362,11 +436,35 @@ export const HttpRequestNode: NodeTypeDefinition = {
         'User-Agent': 'KERDAR/1.0',
       };
 
+      // Query parameters (for API key if needed)
+      const qs: Record<string, unknown> = {};
+
       // Authentication
       if (authentication === AuthenticationType.BearerToken) {
         const token = context.getNodeParameter<string>('bearerToken', '');
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
+        }
+      } else if (authentication === AuthenticationType.BasicAuth) {
+        const username = context.getNodeParameter<string>('basicAuthUser', '');
+        const password = context.getNodeParameter<string>('basicAuthPassword', '');
+        if (username) {
+          // Base64 encode username:password for Basic Auth
+          const credentials = Buffer.from(`${username}:${password}`).toString('base64');
+          headers['Authorization'] = `Basic ${credentials}`;
+        }
+      } else if (authentication === AuthenticationType.ApiKey) {
+        const apiKeyName = context.getNodeParameter<string>('apiKeyName', 'X-API-Key');
+        const apiKeyValue = context.getNodeParameter<string>('apiKeyValue', '');
+        const apiKeyLocation = context.getNodeParameter<string>('apiKeyLocation', 'header');
+
+        if (apiKeyValue) {
+          if (apiKeyLocation === 'header') {
+            headers[apiKeyName] = apiKeyValue;
+          } else {
+            // Query string
+            qs[apiKeyName] = apiKeyValue;
+          }
         }
       }
 
@@ -381,8 +479,7 @@ export const HttpRequestNode: NodeTypeDefinition = {
         });
       }
 
-      // Query parameters
-      const qs: Record<string, unknown> = {};
+      // Additional query parameters
       const sendQuery = context.getNodeParameter<boolean>('sendQuery', false);
       if (sendQuery) {
         const queryParams = context.getNodeParameter<{ parameters?: Array<{ name: string; value: string }> }>('queryParameters', {});

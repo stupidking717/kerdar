@@ -1,5 +1,5 @@
 import { memo, useState, useCallback, useRef, useEffect } from 'react';
-import { Code, Type, Check } from 'lucide-react';
+import { Code, Type, Check, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { ExpressionEditor, isExpression, wrapAsExpression, type ExpressionContext } from './ExpressionEditor';
 import { CodeEditor } from '../ui/CodeEditor';
@@ -356,6 +356,28 @@ export const ParameterInput = memo<ParameterInputProps>(({
           </div>
         );
 
+      case PropertyType.FixedCollection:
+        return (
+          <FixedCollectionInput
+            property={property}
+            value={value as Record<string, Array<Record<string, unknown>>> | undefined}
+            onChange={onChange}
+            expressionContext={expressionContext}
+            nodeId={nodeId}
+          />
+        );
+
+      case PropertyType.Collection:
+        return (
+          <CollectionInput
+            property={property}
+            value={value as Record<string, unknown> | undefined}
+            onChange={onChange}
+            expressionContext={expressionContext}
+            nodeId={nodeId}
+          />
+        );
+
       default:
         return (
           <input
@@ -597,6 +619,295 @@ function formatValueForInput(v: unknown): string {
   if (Array.isArray(v)) return JSON.stringify(v);
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
+}
+
+/**
+ * FixedCollectionInput - Renders key-value pairs with add/remove
+ * Used for headers, query parameters, etc.
+ */
+interface FixedCollectionInputProps {
+  property: NodeProperty;
+  value: Record<string, Array<Record<string, unknown>>> | undefined;
+  onChange: (value: Record<string, Array<Record<string, unknown>>>) => void;
+  expressionContext?: ExpressionContext;
+  nodeId?: string;
+}
+
+function FixedCollectionInput({
+  property,
+  value,
+  onChange,
+  expressionContext,
+  nodeId,
+}: FixedCollectionInputProps) {
+  const { values: childProperties, typeOptions } = property;
+  const multipleValues = typeOptions?.multipleValues ?? true;
+  const buttonText = typeOptions?.multipleValueButtonText || 'Add Item';
+
+  // Use 'parameters' as the default group key (n8n convention)
+  const groupKey = 'parameters';
+  const items = value?.[groupKey] || [];
+
+  const handleAddItem = () => {
+    // Create a new item with default values from child properties
+    const newItem: Record<string, unknown> = {};
+    childProperties?.forEach((prop) => {
+      newItem[prop.name] = prop.default ?? '';
+    });
+
+    onChange({
+      ...value,
+      [groupKey]: [...items, newItem],
+    });
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const newItems = items.filter((_, i) => i !== index);
+    onChange({
+      ...value,
+      [groupKey]: newItems,
+    });
+  };
+
+  const handleItemChange = (index: number, fieldName: string, fieldValue: unknown) => {
+    const newItems = items.map((item, i) => {
+      if (i === index) {
+        return { ...item, [fieldName]: fieldValue };
+      }
+      return item;
+    });
+    onChange({
+      ...value,
+      [groupKey]: newItems,
+    });
+  };
+
+  if (!childProperties || childProperties.length === 0) {
+    return <div className="text-sm text-gray-500">No fields defined</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.map((item, index) => (
+        <div
+          key={index}
+          className="flex items-start gap-2 p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700"
+        >
+          <div className="flex-1 grid gap-2" style={{ gridTemplateColumns: `repeat(${childProperties.length}, 1fr)` }}>
+            {childProperties.map((childProp) => (
+              <div key={childProp.name} className="space-y-1">
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  {childProp.displayName}
+                </label>
+                {isExpression(item[childProp.name]) ? (
+                  <ExpressionEditor
+                    value={String(item[childProp.name] || '')}
+                    onChange={(v) => handleItemChange(index, childProp.name, v)}
+                    context={expressionContext}
+                    nodeId={nodeId}
+                    singleLine
+                    height="36px"
+                    placeholder={childProp.placeholder}
+                  />
+                ) : (
+                  <input
+                    type={childProp.typeOptions?.password ? 'password' : 'text'}
+                    value={String(item[childProp.name] || '')}
+                    onChange={(e) => handleItemChange(index, childProp.name, e.target.value)}
+                    placeholder={childProp.placeholder || childProp.displayName}
+                    className={cn(
+                      'w-full px-2 py-1.5 text-sm rounded',
+                      'border border-gray-300 dark:border-slate-600',
+                      'bg-white dark:bg-slate-700',
+                      'text-gray-900 dark:text-gray-100',
+                      'focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    )}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleRemoveItem(index)}
+            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+            title="Remove"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+
+      {(multipleValues || items.length === 0) && (
+        <button
+          type="button"
+          onClick={handleAddItem}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-2 w-full',
+            'text-sm text-blue-600 dark:text-blue-400',
+            'border border-dashed border-gray-300 dark:border-slate-600',
+            'rounded-lg hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20',
+            'transition-colors'
+          )}
+        >
+          <Plus className="w-4 h-4" />
+          {buttonText}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * CollectionInput - Renders a collapsible group of nested properties
+ * Used for options groups like "Options" in HTTP Request
+ */
+interface CollectionInputProps {
+  property: NodeProperty;
+  value: Record<string, unknown> | undefined;
+  onChange: (value: Record<string, unknown>) => void;
+  expressionContext?: ExpressionContext;
+  nodeId?: string;
+}
+
+function CollectionInput({
+  property,
+  value = {},
+  onChange,
+  expressionContext: _expressionContext,
+  nodeId: _nodeId,
+}: CollectionInputProps) {
+  // Note: expressionContext and nodeId can be used for expression support in nested fields
+  void _expressionContext;
+  void _nodeId;
+  const [isExpanded, setIsExpanded] = useState(false);
+  const { values: childProperties } = property;
+
+  // Count how many properties have been set
+  const setCount = childProperties?.filter(
+    (p) => value[p.name] !== undefined && value[p.name] !== p.default
+  ).length ?? 0;
+
+  const handleChildChange = (fieldName: string, fieldValue: unknown) => {
+    onChange({
+      ...value,
+      [fieldName]: fieldValue,
+    });
+  };
+
+  if (!childProperties || childProperties.length === 0) {
+    return <div className="text-sm text-gray-500">No options available</div>;
+  }
+
+  return (
+    <div className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
+      {/* Header - Click to expand/collapse */}
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={cn(
+          'flex items-center justify-between w-full px-3 py-2',
+          'text-sm font-medium text-gray-700 dark:text-gray-300',
+          'bg-gray-50 dark:bg-slate-800',
+          'hover:bg-gray-100 dark:hover:bg-slate-700',
+          'transition-colors'
+        )}
+      >
+        <div className="flex items-center gap-2">
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+          <span>Options</span>
+        </div>
+        {setCount > 0 && (
+          <span className="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full">
+            {setCount} set
+          </span>
+        )}
+      </button>
+
+      {/* Expanded content */}
+      {isExpanded && (
+        <div className="p-3 space-y-3 bg-white dark:bg-slate-800/50">
+          {childProperties.map((childProp) => (
+            <div key={childProp.name} className="space-y-1">
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                {childProp.displayName}
+              </label>
+
+              {/* Render based on child property type */}
+              {childProp.type === PropertyType.Boolean ? (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={(value[childProp.name] as boolean) ?? childProp.default ?? false}
+                    onChange={(e) => handleChildChange(childProp.name, e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    {childProp.description}
+                  </span>
+                </label>
+              ) : childProp.type === PropertyType.Number ? (
+                <input
+                  type="number"
+                  value={(value[childProp.name] as number) ?? childProp.default ?? ''}
+                  onChange={(e) => handleChildChange(childProp.name, parseFloat(e.target.value) || 0)}
+                  placeholder={childProp.placeholder}
+                  className={cn(
+                    'w-full px-2 py-1.5 text-sm rounded',
+                    'border border-gray-300 dark:border-slate-600',
+                    'bg-white dark:bg-slate-700',
+                    'text-gray-900 dark:text-gray-100',
+                    'focus:ring-2 focus:ring-blue-500'
+                  )}
+                />
+              ) : childProp.type === PropertyType.Options ? (
+                <Select
+                  value={getOptionValue(value[childProp.name] ?? childProp.default)}
+                  onValueChange={(val) => {
+                    const opt = childProp.options?.find((o) => getOptionValue(o.value) === val);
+                    handleChildChange(childProp.name, opt?.value ?? val);
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {childProp.options?.map((opt) => (
+                      <SelectItem key={getOptionValue(opt.value)} value={getOptionValue(opt.value)}>
+                        {opt.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <input
+                  type={childProp.typeOptions?.password ? 'password' : 'text'}
+                  value={String(value[childProp.name] ?? childProp.default ?? '')}
+                  onChange={(e) => handleChildChange(childProp.name, e.target.value)}
+                  placeholder={childProp.placeholder}
+                  className={cn(
+                    'w-full px-2 py-1.5 text-sm rounded',
+                    'border border-gray-300 dark:border-slate-600',
+                    'bg-white dark:bg-slate-700',
+                    'text-gray-900 dark:text-gray-100',
+                    'focus:ring-2 focus:ring-blue-500'
+                  )}
+                />
+              )}
+
+              {childProp.description && childProp.type !== PropertyType.Boolean && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">{childProp.description}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default ParameterInput;

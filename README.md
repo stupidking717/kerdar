@@ -13,6 +13,9 @@ A production-ready, embeddable React workflow designer library inspired by n8n. 
 - **Visual Workflow Designer** - Drag & drop nodes, connect them visually
 - **34+ Built-in Nodes** - Triggers, actions, logic, data transformations, integrations
 - **Expression Editor** - Monaco-based editor with autocomplete for data references
+- **Schema System** - Type-safe data flow with intelligent autocomplete
+- **Credential Management** - n8n-style credential selector with secure storage
+- **Inline Editing** - Click on node names to edit directly on canvas
 - **Client-side Execution** - Run workflows directly in the browser
 - **TypeScript First** - Full type safety with comprehensive type definitions
 - **Themeable** - Light/dark mode with customizable colors
@@ -603,6 +606,97 @@ const result = await simulateWorkflow(workflow, {
 const dataFlow = previewSimulationDataFlow(workflow);
 // Returns Map<nodeId, { input: [...], output: [...] }>
 ```
+
+## Property Types
+
+KERDAR supports all standard n8n property types for node parameters:
+
+| Type | Description |
+|------|-------------|
+| `string` | Text input with optional password mode |
+| `number` | Numeric input with min/max validation |
+| `boolean` | Toggle switch |
+| `options` | Dropdown select |
+| `multiOptions` | Multi-select dropdown |
+| `json` | JSON editor |
+| `code` | Monaco code editor |
+| `collection` | Collapsible group of nested properties |
+| `fixedCollection` | Array of key-value pairs (headers, query params) |
+| `dateTime` | Date/time picker |
+| `color` | Color picker |
+| `notice` | Info message display |
+
+### FixedCollection Example (Custom Headers)
+
+```tsx
+{
+  name: 'headerParameters',
+  displayName: 'Header Parameters',
+  type: PropertyType.FixedCollection,
+  default: {},
+  typeOptions: {
+    multipleValues: true,
+    multipleValueButtonText: 'Add Header',
+  },
+  values: [
+    { name: 'name', displayName: 'Name', type: PropertyType.String, default: '' },
+    { name: 'value', displayName: 'Value', type: PropertyType.String, default: '' },
+  ],
+}
+```
+
+### Collection Example (Options Group)
+
+```tsx
+{
+  name: 'options',
+  displayName: 'Options',
+  type: PropertyType.Collection,
+  default: {},
+  values: [
+    { name: 'timeout', displayName: 'Timeout (ms)', type: PropertyType.Number, default: 30000 },
+    { name: 'followRedirects', displayName: 'Follow Redirects', type: PropertyType.Boolean, default: true },
+    { name: 'ignoreSSL', displayName: 'Ignore SSL Issues', type: PropertyType.Boolean, default: false },
+  ],
+}
+```
+
+## Credential System
+
+Nodes can require credentials for authentication. The credential selector UI automatically appears when a node defines credentials:
+
+```tsx
+const HttpRequestNode: NodeTypeDefinition = {
+  // ...
+  credentials: [
+    {
+      name: 'httpBasicAuth',
+      displayName: 'HTTP Basic Auth',
+      displayOptions: {
+        show: { authentication: ['basicAuth'] },
+      },
+    },
+    {
+      name: 'apiKey',
+      displayName: 'API Key',
+      displayOptions: {
+        show: { authentication: ['apiKey'] },
+      },
+    },
+  ],
+  // ...
+};
+```
+
+### HTTP Request Authentication Options
+
+The built-in HTTP Request node supports multiple authentication types:
+
+- **None** - No authentication
+- **Basic Auth** - Username/password with Base64 encoding
+- **API Key** - Configurable key name, value, and location (header/query)
+- **Header Auth** - Custom header via credential
+- **Bearer Token** - OAuth-style bearer token
 
 ## API Reference
 

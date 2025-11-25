@@ -3,15 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   X, Play, Save, Settings, FileText, ChevronLeft, ChevronRight,
-  Loader2, GripVertical, Maximize2, Minimize2,
+  Loader2, GripVertical, Maximize2, Minimize2, KeyRound,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/Button';
 import { NodeIcon } from '../Nodes/NodeIcon';
 import { InputDataPanel, type InputDataItem } from './InputDataPanel';
 import { ParameterInput } from './ParameterInput';
+import { CredentialSelect } from './CredentialSelect';
 import type { ExpressionContext } from './ExpressionEditor';
-import type { WorkflowNode, NodeTypeDefinition, Credential } from '../../types';
+import type { WorkflowNode, NodeTypeDefinition, Credential, NodeCredential } from '../../types';
 
 /**
  * Props for NodeDetailsView
@@ -33,6 +34,10 @@ export interface NodeDetailsViewProps {
   isSampleData?: boolean;
   /** Available credentials */
   availableCredentials?: Record<string, Credential[]>;
+  /** Called when credential selection changes */
+  onCredentialChange?: (credentialType: string, credential: NodeCredential | undefined) => void;
+  /** Called when user wants to create new credential */
+  onCreateCredential?: (credentialType: string) => void;
   /** Called when parameters are saved */
   onSave?: (parameters: Record<string, unknown>, settings: NodeSettings) => void;
   /** Called when cancel/close is clicked */
@@ -70,7 +75,9 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
   inputData = [],
   sourceNodeName,
   isSampleData = false,
-  availableCredentials: _availableCredentials,
+  availableCredentials = {},
+  onCredentialChange,
+  onCreateCredential,
   onSave,
   onClose,
   onExecute,
@@ -147,7 +154,10 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
       if (show) {
         for (const [field, values] of Object.entries(show)) {
           const currentValue = parameters[field];
-          if (!values.includes(currentValue)) {
+          // Compare as strings to handle enum values properly
+          const stringValues = values.map((v) => String(v));
+          const stringCurrentValue = currentValue !== undefined ? String(currentValue) : undefined;
+          if (!stringValues.includes(stringCurrentValue as string)) {
             return false;
           }
         }
@@ -156,7 +166,10 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
       if (hide) {
         for (const [field, values] of Object.entries(hide)) {
           const currentValue = parameters[field];
-          if (values.includes(currentValue)) {
+          // Compare as strings to handle enum values properly
+          const stringValues = values.map((v) => String(v));
+          const stringCurrentValue = currentValue !== undefined ? String(currentValue) : undefined;
+          if (stringValues.includes(stringCurrentValue as string)) {
             return false;
           }
         }
@@ -165,6 +178,49 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
       return true;
     });
   }, [nodeType.properties, parameters]);
+
+  // Filter visible credentials based on displayOptions
+  const visibleCredentials = useMemo(() => {
+    if (!nodeType.credentials) return [];
+
+    return nodeType.credentials.filter((cred) => {
+      if (!cred.displayOptions) return true;
+
+      const { show, hide } = cred.displayOptions;
+
+      if (show) {
+        for (const [field, values] of Object.entries(show)) {
+          const currentValue = parameters[field];
+          // Compare as strings to handle enum values properly
+          const stringValues = values.map((v) => String(v));
+          const stringCurrentValue = currentValue !== undefined ? String(currentValue) : undefined;
+          if (!stringValues.includes(stringCurrentValue as string)) {
+            return false;
+          }
+        }
+      }
+
+      if (hide) {
+        for (const [field, values] of Object.entries(hide)) {
+          const currentValue = parameters[field];
+          // Compare as strings to handle enum values properly
+          const stringValues = values.map((v) => String(v));
+          const stringCurrentValue = currentValue !== undefined ? String(currentValue) : undefined;
+          if (stringValues.includes(stringCurrentValue as string)) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
+  }, [nodeType.credentials, parameters]);
+
+  // Handle credential change
+  const handleCredentialChange = useCallback((credentialType: string, credential: NodeCredential | undefined) => {
+    onCredentialChange?.(credentialType, credential);
+    setIsDirty(true);
+  }, [onCredentialChange]);
 
   // Handlers
   const handleParameterChange = useCallback((name: string, value: unknown) => {
@@ -309,7 +365,7 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
             </div>
 
             {/* Main Content - Split Panels */}
-            <div className="flex-1 flex overflow-visible relative">
+            <div className="flex-1 flex overflow-hidden relative">
               {/* INPUT Panel */}
               {showInputPanel && (
                 <>
@@ -347,12 +403,12 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
               </button>
 
               {/* PARAMETERS Panel */}
-              <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+              <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
                 {/* Tabs */}
                 <Tabs.Root
                   value={activeTab}
                   onValueChange={(v) => setActiveTab(v as typeof activeTab)}
-                  className="flex-1 flex flex-col"
+                  className="flex-1 flex flex-col min-h-0"
                 >
                   <Tabs.List className="flex gap-1 px-4 py-2 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                     <Tabs.Trigger
@@ -393,8 +449,29 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
                   </Tabs.List>
 
                   {/* Parameters Tab */}
-                  <Tabs.Content value="parameters" className="flex-1 overflow-auto p-4 space-y-4">
-                    {visibleProperties.length === 0 ? (
+                  <Tabs.Content value="parameters" className="flex-1 min-h-0 overflow-auto p-4 space-y-4">
+                    {/* Credentials Section */}
+                    {visibleCredentials.length > 0 && (
+                      <div className="space-y-3 pb-4 border-b border-gray-200 dark:border-slate-700">
+                        <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <KeyRound className="w-4 h-4" />
+                          Credentials
+                        </div>
+                        {visibleCredentials.map((credConfig) => (
+                          <CredentialSelect
+                            key={credConfig.name}
+                            credentialConfig={credConfig}
+                            selectedCredential={node.credentials?.[credConfig.name]}
+                            availableCredentials={availableCredentials[credConfig.name] || []}
+                            onChange={(cred) => handleCredentialChange(credConfig.name, cred)}
+                            onCreateNew={onCreateCredential ? () => onCreateCredential(credConfig.name) : undefined}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Parameters Section */}
+                    {visibleProperties.length === 0 && visibleCredentials.length === 0 ? (
                       <div className="text-center text-gray-500 py-8">
                         <p className="text-sm">This node has no configurable parameters.</p>
                       </div>
@@ -417,7 +494,7 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
                   </Tabs.Content>
 
                   {/* Settings Tab */}
-                  <Tabs.Content value="settings" className="flex-1 overflow-auto p-4 space-y-4">
+                  <Tabs.Content value="settings" className="flex-1 min-h-0 overflow-auto p-4 space-y-4">
                     <SettingsToggle
                       label="Always Output Data"
                       description="Output data even if the node fails or returns empty data"
@@ -485,7 +562,7 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
                   </Tabs.Content>
 
                   {/* Notes Tab */}
-                  <Tabs.Content value="notes" className="flex-1 overflow-auto p-4">
+                  <Tabs.Content value="notes" className="flex-1 min-h-0 overflow-auto p-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Notes

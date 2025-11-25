@@ -1,5 +1,6 @@
-import React, { memo, useCallback, useMemo, useState } from 'react';
+import React, { memo, useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
+import { Pencil } from 'lucide-react';
 import {
   MoreHorizontal,
   StickyNote,
@@ -31,6 +32,8 @@ export interface BaseNodeData extends WorkflowNode {
   onDuplicate?: () => void;
   onToggleDisable?: () => void;
   onExecute?: () => void;
+  /** Called when node name is changed via inline editing */
+  onNameChange?: (newName: string) => void;
 }
 
 /**
@@ -126,9 +129,55 @@ function NodeHandle({
  */
 export const BaseNode = memo<BaseNodeProps>(({ data, selected, dragging }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(data.name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const nodeType = useNodeType(data.type);
   const executionStatus = useNodeStatus(data.id);
   useTheme(); // Subscribe to theme changes for re-render
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [isEditingName]);
+
+  // Reset edited name when data.name changes externally
+  useEffect(() => {
+    setEditedName(data.name);
+  }, [data.name]);
+
+  const handleStartEditing = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsEditingName(true);
+  }, []);
+
+  // Handle mousedown to prevent ReactFlow from starting drag
+  const handleNameMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  const handleFinishEditing = useCallback(() => {
+    const trimmedName = editedName.trim();
+    if (trimmedName && trimmedName !== data.name) {
+      data.onNameChange?.(trimmedName);
+    } else {
+      setEditedName(data.name);
+    }
+    setIsEditingName(false);
+  }, [editedName, data]);
+
+  const handleNameKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleFinishEditing();
+    } else if (e.key === 'Escape') {
+      setEditedName(data.name);
+      setIsEditingName(false);
+    }
+  }, [handleFinishEditing, data.name]);
 
   const categoryColor = useMemo(() => {
     if (data.color) return data.color;
@@ -245,9 +294,36 @@ export const BaseNode = memo<BaseNodeProps>(({ data, selected, dragging }) => {
         {/* Header Row */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-              {data.name}
-            </div>
+            {isEditingName ? (
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onBlur={handleFinishEditing}
+                onKeyDown={handleNameKeyDown}
+                className={cn(
+                  'w-full text-sm font-medium px-1 py-0.5 -mx-1 rounded',
+                  'bg-white dark:bg-slate-700',
+                  'border border-blue-500',
+                  'text-gray-900 dark:text-gray-100',
+                  'focus:outline-none focus:ring-2 focus:ring-blue-500'
+                )}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <div
+                className="group/name flex items-center gap-1 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                onClick={handleStartEditing}
+                onMouseDown={handleNameMouseDown}
+                title="Click to edit name"
+              >
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 group-hover/name:text-blue-600 dark:group-hover/name:text-blue-400 truncate">
+                  {data.name}
+                </span>
+                <Pencil className="w-3 h-3 opacity-0 group-hover/name:opacity-100 text-gray-400 flex-shrink-0 transition-opacity" />
+              </div>
+            )}
             {subtitle && (
               <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
                 {subtitle}

@@ -54,9 +54,12 @@ Create a production-ready, open-source React workflow designer library using Rea
 - [x] Category-based organization
 - [x] Dynamic parameter rendering
 - [x] Conditional field visibility (displayOptions)
-- [x] Multiple property types (string, number, boolean, options, multiOptions, json, code, collection)
+- [x] Multiple property types (string, number, boolean, options, multiOptions, json, code, collection, fixedCollection)
+- [x] FixedCollection property type with add/remove items (key-value pairs for headers, query params)
+- [x] Collection property type with collapsible options groups
 - [x] Styled dropdown components (Radix UI Select)
 - [x] Multi-select dropdown component
+- [x] Inline node name editing on canvas (click to edit)
 
 #### Execution Engine
 - [x] Client-side workflow execution
@@ -134,6 +137,9 @@ Create a production-ready, open-source React workflow designer library using Rea
 - [x] Node sidebar with search
 - [x] Execution history panel
 - [x] Button component with variants
+- [x] Credential selector component (n8n-style dropdown)
+- [x] FixedCollection input component (add/remove items)
+- [x] Collection input component (collapsible options)
 
 ### Pending Features
 
@@ -142,11 +148,11 @@ Create a production-ready, open-source React workflow designer library using Rea
 - [ ] Execute Workflow node with async callback data fetching
 - [ ] JSON editor expression drop at cursor position fix
 - [ ] Proper Lock, Parallel, Sequence node implementations
+- [ ] i18n internationalization support
 
 #### Medium Priority
 - [ ] Credential storage integration
 - [ ] Workflow templates
-- [ ] Node authentication audit and fixes
 - [ ] Example workflow demonstrating schema binding
 
 #### Low Priority

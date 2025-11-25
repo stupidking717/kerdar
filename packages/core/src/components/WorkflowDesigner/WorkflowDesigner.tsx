@@ -62,7 +62,8 @@ function toReactFlowNodes(
   onConfigure: (node: WorkflowNode) => void,
   onDelete: (nodeId: string) => void,
   onDuplicate: (nodeId: string) => void,
-  onToggleDisable: (nodeId: string) => void
+  onToggleDisable: (nodeId: string) => void,
+  onNameChange: (nodeId: string, newName: string) => void
 ): Node<BaseNodeData>[] {
   return nodes.map((node) => ({
     id: node.id,
@@ -75,6 +76,7 @@ function toReactFlowNodes(
       onDelete: () => onDelete(node.id),
       onDuplicate: () => onDuplicate(node.id),
       onToggleDisable: () => onToggleDisable(node.id),
+      onNameChange: (newName: string) => onNameChange(node.id, newName),
     },
     selected: false,
     draggable: !node.disabled,
@@ -249,13 +251,18 @@ const InnerWorkflowDesigner = memo<InnerWorkflowDesignerProps>(({
       workflowStore.toggleNodeDisabled(nodeId);
     };
 
+    const handleNameChange = (nodeId: string, newName: string) => {
+      workflowStore.updateNode(nodeId, { name: newName });
+    };
+
     const rfNodes = toReactFlowNodes(
       workflowStore.workflow.nodes,
       nodeStatusMap,
       handleConfigure,
       handleDelete,
       handleDuplicate,
-      handleToggleDisable
+      handleToggleDisable,
+      handleNameChange
     );
 
     const rfEdges = toReactFlowEdges(workflowStore.workflow.edges);
