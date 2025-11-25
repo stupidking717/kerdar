@@ -38,5 +38,18 @@
     "n8n",
     "automation"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "author": "Navid Kianfar",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/navid-kianfar/kerdar.git",
+    "directory": "packages/nodes-standard"
+  },
+  "bugs": {
+    "url": "https://github.com/navid-kianfar/kerdar/issues"
+  },
+  "homepage": "https://github.com/navid-kianfar/kerdar#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }

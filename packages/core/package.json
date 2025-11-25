@@ -83,12 +83,17 @@
     "reactflow"
   ],
   "license": "MIT",
+  "author": "Navid Kianfar",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kerdar/kerdar.git"
+    "url": "https://github.com/navid-kianfar/kerdar.git",
+    "directory": "packages/core"
   },
   "bugs": {
-    "url": "https://github.com/kerdar/kerdar/issues"
+    "url": "https://github.com/navid-kianfar/kerdar/issues"
   },
-  "homepage": "https://kerdar.dev"
+  "homepage": "https://github.com/navid-kianfar/kerdar#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }
