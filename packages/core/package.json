@@ -1,6 +1,6 @@
 {
   "name": "@kerdar/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Modern React Workflow Designer Library - Core Package",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

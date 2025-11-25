@@ -1,6 +1,6 @@
 {
   "name": "@kerdar/nodes-standard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Standard node types for KERDAR workflow designer",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
