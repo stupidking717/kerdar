@@ -40,6 +40,7 @@ import { ParallelNode } from './nodes/logic/Parallel';
 import { SequenceNode } from './nodes/logic/Sequence';
 import { ErrorHandlerNode } from './nodes/logic/ErrorHandler';
 import { DebounceNode } from './nodes/logic/Debounce';
+import { ThrottleNode } from './nodes/logic/Throttle';
 
 // Import data nodes
 import { SetVariableNode } from './nodes/data/SetVariable';
@@ -95,6 +96,7 @@ export const logicNodes: NodeTypeDefinition[] = [
   SequenceNode,
   ErrorHandlerNode,
   DebounceNode,
+  ThrottleNode,
 ];
 
 /**
@@ -161,6 +163,7 @@ export {
   SequenceNode,
   ErrorHandlerNode,
   DebounceNode,
+  ThrottleNode,
   // Data
   SetVariableNode,
   FilterNode,

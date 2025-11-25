@@ -2,6 +2,7 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 import {
   WorkflowDesigner,
   NodeSidebar,
+  ExecutionHistory,
   registerNodes,
   useWorkflowStore,
   useExecutionStore,
@@ -12,6 +13,7 @@ import {
   type WorkflowDesignerProps,
   type WorkflowDesignerRef,
   type NodeTypeDefinition,
+  type ExecutionRecord,
   ThemeMode,
   ExecutionOrderVersion,
   DataSaveMode,
@@ -31,14 +33,14 @@ const sampleWorkflow: Workflow = {
       id: 'node-1',
       type: 'manualTrigger',
       name: 'Start',
-      position: { x: 100, y: 200 },
+      position: { x: 150, y: 200 },
       parameters: {},
     },
     {
       id: 'node-2',
       type: 'httpRequest',
       name: 'Fetch Data',
-      position: { x: 350, y: 200 },
+      position: { x: 400, y: 200 },
       parameters: {
         url: 'https://jsonplaceholder.typicode.com/posts',
         method: 'GET',
@@ -48,7 +50,7 @@ const sampleWorkflow: Workflow = {
       id: 'node-3',
       type: 'if',
       name: 'Filter Posts',
-      position: { x: 600, y: 200 },
+      position: { x: 650, y: 200 },
       parameters: {
         conditions: {
           conditions: [
@@ -66,7 +68,7 @@ const sampleWorkflow: Workflow = {
       id: 'node-4',
       type: 'setVariable',
       name: 'Transform Data',
-      position: { x: 850, y: 150 },
+      position: { x: 900, y: 150 },
       parameters: {
         mode: 'keep',
         fields: 'id, title',
@@ -76,7 +78,7 @@ const sampleWorkflow: Workflow = {
       id: 'node-5',
       type: 'noOp',
       name: 'Discarded',
-      position: { x: 850, y: 300 },
+      position: { x: 900, y: 300 },
       parameters: {},
     },
   ],
@@ -131,10 +133,12 @@ const sampleWorkflow: Workflow = {
 function App() {
   const [isReady, setIsReady] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const designerRef = useRef<WorkflowDesignerRef>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const { setWorkflow, workflow, addNode } = useWorkflowStore();
   const { isExecuting, startExecution, cancelExecution } = useExecutionStore();
-  const { createNodeInstance } = useNodeRegistryStore();
+  const { createNodeInstance, getNodeType } = useNodeRegistryStore();
   const mode = useThemeMode();
   const { setMode } = useThemeActions();
 
@@ -187,13 +191,60 @@ function App() {
   // Handle node click from sidebar - add node to canvas
   const handleNodeClick = useCallback((nodeType: NodeTypeDefinition) => {
     const newNode = createNodeInstance(nodeType.type, {
-      x: 400 + Math.random() * 100,
-      y: 200 + Math.random() * 100,
+      x: 400 + Math.random() * 200,
+      y: 150 + Math.random() * 200,
     });
     if (newNode) {
       addNode(newNode);
     }
   }, [createNodeInstance, addNode]);
+
+  // Handle drag start from sidebar
+  const handleNodeDragStart = useCallback((nodeType: NodeTypeDefinition, event: React.DragEvent) => {
+    event.dataTransfer.setData('application/kerdar-node', JSON.stringify({
+      type: nodeType.type,
+      name: nodeType.name,
+    }));
+    event.dataTransfer.effectAllowed = 'copy';
+  }, []);
+
+  // Mock execution history fetch
+  const handleFetchHistory = useCallback(async (): Promise<ExecutionRecord[]> => {
+    // Simulate API delay
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    // Return mock data
+    const statuses: ExecutionRecord['status'][] = ['success', 'error', 'success', 'success', 'error'];
+    const modes: ExecutionRecord['mode'][] = ['manual', 'webhook', 'schedule', 'manual', 'webhook'];
+
+    return Array.from({ length: 8 }, (_, i) => {
+      const startTime = new Date(Date.now() - i * 3600000 - Math.random() * 1800000);
+      const duration = Math.floor(Math.random() * 5000) + 500;
+      const status = statuses[i % statuses.length];
+
+      return {
+        id: `exec-${Date.now() - i * 1000}-${Math.random().toString(36).substr(2, 9)}`,
+        workflowId: 'demo-workflow-1',
+        workflowName: 'Sample API Workflow',
+        status,
+        startedAt: startTime.toISOString(),
+        finishedAt: new Date(startTime.getTime() + duration).toISOString(),
+        duration,
+        mode: modes[i % modes.length],
+        error: status === 'error' ? 'Connection timeout: Failed to connect to external API' : undefined,
+        nodeResults: [
+          { nodeId: 'node-1', nodeName: 'Start', status: 'success', duration: 10, outputItems: 1 },
+          { nodeId: 'node-2', nodeName: 'Fetch Data', status: status === 'error' && i % 2 === 1 ? 'error' : 'success', duration: duration - 100, outputItems: status === 'error' ? 0 : 25 },
+          { nodeId: 'node-3', nodeName: 'Filter Posts', status: status === 'error' ? 'skipped' : 'success', duration: 50, outputItems: status === 'error' ? 0 : 10 },
+        ],
+      };
+    });
+  }, []);
+
+  // Handle execution selection
+  const handleExecutionSelect = useCallback((execution: ExecutionRecord) => {
+    console.log('Selected execution:', execution);
+  }, []);
 
   if (!isReady) {
     return (
@@ -212,7 +263,7 @@ function App() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col">
+    <div className="h-screen w-screen flex flex-col bg-gray-100 dark:bg-slate-900">
       {/* Header */}
       <header className="h-14 border-b border-border bg-background flex items-center px-4 justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -235,9 +286,21 @@ function App() {
         <div className="flex items-center gap-2">
           <button
             onClick={handleExecuteClick}
-            className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            className="px-4 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
           >
-            {isExecuting ? 'Stop' : 'Execute'}
+            {isExecuting ? (
+              <>
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                Stop
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+                Execute
+              </>
+            )}
           </button>
           <button
             onClick={handleSaveClick}
@@ -249,18 +312,8 @@ function App() {
             onClick={handleThemeToggle}
             className="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
           >
-            {mode === ThemeMode.Dark ? 'Light' : 'Dark'}
+            {mode === ThemeMode.Dark ? '☀️' : '🌙'}
           </button>
-          <a
-            href="https://github.com/your-org/kerdar"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-            </svg>
-          </a>
         </div>
       </header>
 
@@ -269,14 +322,28 @@ function App() {
         {/* Node Sidebar */}
         <NodeSidebar
           onNodeClick={handleNodeClick}
+          onNodeDragStart={handleNodeDragStart}
           collapsed={sidebarCollapsed}
           onCollapseChange={setSidebarCollapsed}
         />
 
-        {/* Workflow Canvas */}
-        <div className="flex-1">
+        {/* Workflow Canvas - drop is handled by WorkflowDesigner internally */}
+        <div ref={canvasRef} className="flex-1 relative">
           <WorkflowDesigner ref={designerRef} {...designerProps} />
+
+          {/* Zoom controls hint */}
+          <div className="absolute bottom-4 left-4 text-xs text-gray-400 dark:text-gray-600 pointer-events-none">
+            Scroll to zoom • Drag to pan • Double-click to configure
+          </div>
         </div>
+
+        {/* Execution History */}
+        <ExecutionHistory
+          onFetchHistory={handleFetchHistory}
+          onExecutionSelect={handleExecutionSelect}
+          collapsed={historyCollapsed}
+          onCollapseChange={setHistoryCollapsed}
+        />
       </main>
 
       {/* Footer */}
@@ -288,7 +355,7 @@ function App() {
         </div>
         <div className="flex items-center gap-4">
           {isExecuting && (
-            <span className="flex items-center gap-1 text-status-running">
+            <span className="flex items-center gap-1 text-green-600">
               <span className="animate-pulse">●</span> Executing...
             </span>
           )}

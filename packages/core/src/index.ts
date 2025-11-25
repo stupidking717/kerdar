@@ -13,10 +13,13 @@ export { BaseDialog, DialogHeader, DialogBody, DialogFooter } from './components
 export { NodeParametersDialog, type NodeParametersDialogProps } from './components/Dialogs';
 
 // UI components
-export { Button, buttonVariants, type ButtonProps } from './components/ui';
+export { Button, buttonVariants, type ButtonProps, CodeEditor, type CodeEditorProps } from './components/ui';
 
 // Sidebar components
 export { NodeSidebar, type NodeSidebarProps } from './components/NodeSidebar';
+
+// Execution History
+export { ExecutionHistory, type ExecutionHistoryProps, type ExecutionRecord } from './components/ExecutionHistory';
 
 // Stores
 export {

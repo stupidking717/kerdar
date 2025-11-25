@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -120,6 +120,13 @@ export const BaseDialog = memo<BaseDialogProps>(({
   closeOnEscape = true,
   icon,
 }) => {
+  // Get body container for portal (ensures fixed positioning works correctly)
+  const [container, setContainer] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setContainer(document.body);
+  }, []);
+
   // Handle escape key
   useEffect(() => {
     if (!closeOnEscape || !closable) return;
@@ -143,8 +150,8 @@ export const BaseDialog = memo<BaseDialogProps>(({
   return (
     <Dialog.Root open={open} onOpenChange={(open) => !open && closable && onClose()}>
       <AnimatePresence>
-        {open && (
-          <Dialog.Portal forceMount>
+        {open && container && (
+          <Dialog.Portal forceMount container={container}>
             {/* Overlay */}
             <Dialog.Overlay asChild forceMount>
               <motion.div

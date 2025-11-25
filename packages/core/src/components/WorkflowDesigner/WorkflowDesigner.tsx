@@ -380,6 +380,41 @@ const InnerWorkflowDesigner = memo<InnerWorkflowDesignerProps>(({
     [onViewportChange]
   );
 
+  // Handle drop on canvas
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const data = event.dataTransfer.getData('application/kerdar-node');
+      if (!data) return;
+
+      try {
+        const { type } = JSON.parse(data);
+        const nodeType = nodeRegistry.getNodeType(type);
+        if (!nodeType) return;
+
+        // Use ReactFlow's screenToFlowPosition to get correct coordinates
+        const position = reactFlowInstance.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+
+        const newNode = nodeRegistry.createNodeInstance(type, position);
+        if (newNode) {
+          workflowStore.addNode(newNode);
+        }
+      } catch (e) {
+        console.error('Failed to parse dropped node data:', e);
+      }
+    },
+    [nodeRegistry, reactFlowInstance, workflowStore]
+  );
+
+  // Handle drag over on canvas
+  const handleDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -526,6 +561,8 @@ const InnerWorkflowDesigner = memo<InnerWorkflowDesignerProps>(({
         className
       )}
       style={style}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
     >
       <ReactFlow
         nodes={nodes}

@@ -4,6 +4,7 @@ import { Settings, FileText, Play, Save, Loader2 } from 'lucide-react';
 import { BaseDialog } from './BaseDialog';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/Button';
+import { CodeEditor } from '../ui/CodeEditor';
 import type {
   WorkflowNode,
   NodeTypeDefinition,
@@ -513,40 +514,65 @@ function PropertyField({ property, value, onChange, credentials: _credentials }:
         );
 
       case PropertyType.Options:
+        // Serialize value for comparison - handles objects and primitives
+        const getOptionValue = (v: unknown): string => {
+          if (v === null || v === undefined) return '';
+          if (typeof v === 'object') return JSON.stringify(v);
+          return String(v);
+        };
+        const currentValue = getOptionValue(value);
         return (
           <select
             {...commonProps}
-            value={(value as string) ?? ''}
-            onChange={(e) => onChange(e.target.value)}
+            value={currentValue}
+            onChange={(e) => {
+              const selectedOpt = options?.find((opt) => getOptionValue(opt.value) === e.target.value);
+              onChange(selectedOpt?.value ?? e.target.value);
+            }}
             className={fieldClasses}
           >
             <option value="">Select...</option>
-            {options?.map((opt) => (
-              <option key={String(opt.value)} value={String(opt.value)}>
-                {opt.name}
-              </option>
-            ))}
+            {options?.map((opt) => {
+              const optValue = getOptionValue(opt.value);
+              return (
+                <option key={optValue} value={optValue}>
+                  {opt.name}
+                </option>
+              );
+            })}
           </select>
         );
 
       case PropertyType.MultiOptions:
-        const selectedValues = (value as string[]) ?? [];
+        // Helper for multi-select options
+        const getMultiOptionValue = (v: unknown): string => {
+          if (v === null || v === undefined) return '';
+          if (typeof v === 'object') return JSON.stringify(v);
+          return String(v);
+        };
+        const selectedValues = ((value as unknown[]) ?? []).map(getMultiOptionValue);
         return (
           <select
             {...commonProps}
             multiple
             value={selectedValues}
             onChange={(e) => {
-              const selected = Array.from(e.target.selectedOptions, (opt) => opt.value);
+              const selected = Array.from(e.target.selectedOptions, (opt) => {
+                const foundOpt = options?.find((o) => getMultiOptionValue(o.value) === opt.value);
+                return foundOpt?.value ?? opt.value;
+              });
               onChange(selected);
             }}
             className={cn(fieldClasses, 'min-h-[100px]')}
           >
-            {options?.map((opt) => (
-              <option key={String(opt.value)} value={String(opt.value)}>
-                {opt.name}
-              </option>
-            ))}
+            {options?.map((opt) => {
+              const optValue = getMultiOptionValue(opt.value);
+              return (
+                <option key={optValue} value={optValue}>
+                  {opt.name}
+                </option>
+              );
+            })}
           </select>
         );
 
@@ -568,13 +594,14 @@ function PropertyField({ property, value, onChange, credentials: _credentials }:
         );
 
       case PropertyType.Code:
+        const codeLanguage = typeOptions?.language || 'javascript';
         return (
-          <textarea
-            {...commonProps}
+          <CodeEditor
             value={(value as string) ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            rows={10}
-            className={cn(fieldClasses, 'font-mono text-xs resize-y')}
+            onChange={onChange}
+            language={codeLanguage}
+            height={typeOptions?.rows ? `${typeOptions.rows * 24}px` : '300px'}
+            placeholder={placeholder}
           />
         );
 

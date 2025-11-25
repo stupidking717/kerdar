@@ -17,3 +17,6 @@ export { Button, buttonVariants, type ButtonProps } from './ui';
 
 // Sidebar
 export { NodeSidebar, type NodeSidebarProps } from './NodeSidebar';
+
+// Execution History
+export { ExecutionHistory, type ExecutionHistoryProps, type ExecutionRecord } from './ExecutionHistory';
