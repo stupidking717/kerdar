@@ -406,6 +406,7 @@ export const NodeDetailsView = memo<NodeDetailsViewProps>(({
                           value={parameters[property.name]}
                           onChange={(value) => handleParameterChange(property.name, value)}
                           expressionContext={expressionContext}
+                          nodeId={node.id}
                           isDragOver={dragOverField === property.name}
                           onDragEnter={() => setDragOverField(property.name)}
                           onDragLeave={() => setDragOverField(null)}

@@ -1,9 +1,11 @@
-import { memo, useCallback, useState, useEffect } from 'react';
+import { memo, useCallback, useState, useEffect, useRef } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Database } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useThemeMode } from '../../store/theme-store';
+import { useSchemaSuggestions } from '../../store/schema-context-store';
 import { ThemeMode } from '../../types';
+import type { SchemaSuggestion } from '../../types';
 
 // Inject global CSS for Monaco autocomplete widgets z-index
 const MONACO_STYLE_ID = 'kerdar-monaco-widgets-style';
@@ -73,6 +75,8 @@ export interface ExpressionEditorProps {
   onChange: (value: string) => void;
   /** Context for resolving expressions */
   context?: ExpressionContext;
+  /** Node ID for schema-aware autocomplete */
+  nodeId?: string;
   /** Placeholder text */
   placeholder?: string;
   /** Whether to show single line mode */
@@ -85,6 +89,41 @@ export interface ExpressionEditorProps {
   showPreview?: boolean;
   /** Error state */
   error?: string;
+  /** Whether to show schema indicator when schema suggestions are available */
+  showSchemaIndicator?: boolean;
+}
+
+/**
+ * Convert SchemaSuggestion kind to Monaco CompletionItemKind
+ */
+function getMonacoKind(
+  kind: SchemaSuggestion['kind'],
+  monaco: Monaco
+): number {
+  switch (kind) {
+    case 'property':
+      return monaco.languages.CompletionItemKind.Property;
+    case 'array':
+      return monaco.languages.CompletionItemKind.Constant;
+    case 'object':
+      return monaco.languages.CompletionItemKind.Module;
+    case 'method':
+      return monaco.languages.CompletionItemKind.Method;
+    case 'variable':
+      return monaco.languages.CompletionItemKind.Variable;
+    default:
+      return monaco.languages.CompletionItemKind.Property;
+  }
+}
+
+/**
+ * Format type for display in autocomplete
+ */
+function formatTypeDisplay(type: SchemaSuggestion['type']): string {
+  if (Array.isArray(type)) {
+    return type.join(' | ');
+  }
+  return type;
 }
 
 /**
@@ -95,15 +134,28 @@ export const ExpressionEditor = memo<ExpressionEditorProps>(({
   value,
   onChange,
   context = {},
+  nodeId,
   placeholder = 'Enter expression... e.g. {{ $json.fieldName }}',
   singleLine = false,
   height = '100px',
   className,
   showPreview = true,
   error,
+  showSchemaIndicator = true,
 }) => {
   const mode = useThemeMode();
   const [preview, setPreview] = useState<{ value: unknown; error?: string } | null>(null);
+
+  // Get schema-based suggestions from connected nodes
+  const schemaSuggestions = useSchemaSuggestions(nodeId ?? null);
+  const schemaSuggestionsRef = useRef<SchemaSuggestion[]>([]);
+
+  // Update ref when suggestions change (for Monaco to access)
+  useEffect(() => {
+    schemaSuggestionsRef.current = schemaSuggestions;
+  }, [schemaSuggestions]);
+
+  const hasSchemaContext = schemaSuggestions.length > 0;
 
   const isDark = mode === ThemeMode.Dark ||
     (mode === ThemeMode.System &&
@@ -377,7 +429,7 @@ export const ExpressionEditor = memo<ExpressionEditorProps>(({
           },
         ];
 
-        // Add top-level $json fields from context
+        // Add top-level $json fields from context (runtime data)
         const jsonFields = context.$json ? Object.keys(context.$json).map(key => {
           const value = context.$json![key];
           const isObject = value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -394,8 +446,26 @@ export const ExpressionEditor = memo<ExpressionEditorProps>(({
           };
         }) : [];
 
+        // Add schema-based suggestions (from node output schemas)
+        const schemaFields = schemaSuggestionsRef.current.map((suggestion, index) => ({
+          label: suggestion.path,
+          kind: getMonacoKind(suggestion.kind, monaco),
+          insertText: suggestion.insertText || suggestion.path,
+          documentation: suggestion.description
+            ? `${suggestion.description}${suggestion.sourceNode ? `\n\nSource: ${suggestion.sourceNode}` : ''}`
+            : suggestion.sourceNode ? `From: ${suggestion.sourceNode}` : undefined,
+          detail: `${formatTypeDisplay(suggestion.type)}${suggestion.sourceNode ? ` • ${suggestion.sourceNode}` : ''}`,
+          range,
+          sortText: `0_schema_${String(index).padStart(3, '0')}`,
+        }));
+
+        // Merge: schema suggestions first, then runtime json fields, then base expressions
+        // Remove duplicates (prefer schema suggestions over runtime)
+        const seenPaths = new Set(schemaFields.map(s => s.label));
+        const filteredJsonFields = jsonFields.filter(f => !seenPaths.has(f.label));
+
         return {
-          suggestions: [...jsonFields, ...baseExpressions],
+          suggestions: [...schemaFields, ...filteredJsonFields, ...baseExpressions],
         };
       },
     });
@@ -403,14 +473,26 @@ export const ExpressionEditor = memo<ExpressionEditorProps>(({
 
   return (
     <div className={cn('rounded-lg overflow-hidden', className)}>
+      {/* Schema indicator */}
+      {showSchemaIndicator && hasSchemaContext && (
+        <div className="flex items-center gap-1.5 px-2 py-1 mb-1 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+          <Database className="w-3 h-3" />
+          <span>Schema-aware autocomplete available from connected nodes</span>
+        </div>
+      )}
+
       {/* Editor */}
       <div
         className={cn(
           'border rounded-lg overflow-hidden',
           error
             ? 'border-red-300 dark:border-red-600'
-            : 'border-amber-300 dark:border-amber-600',
-          'bg-amber-50/50 dark:bg-amber-900/10'
+            : hasSchemaContext
+              ? 'border-blue-300 dark:border-blue-600'
+              : 'border-amber-300 dark:border-amber-600',
+          hasSchemaContext
+            ? 'bg-blue-50/50 dark:bg-blue-900/10'
+            : 'bg-amber-50/50 dark:bg-amber-900/10'
         )}
       >
         <Editor

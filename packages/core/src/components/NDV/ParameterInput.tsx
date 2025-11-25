@@ -25,6 +25,8 @@ export interface ParameterInputProps {
   onChange: (value: unknown) => void;
   /** Expression context for resolving expressions */
   expressionContext?: ExpressionContext;
+  /** Node ID for schema-aware autocomplete */
+  nodeId?: string;
   /** Whether the field is being dragged over */
   isDragOver?: boolean;
   /** Called when drag enters the field */
@@ -46,6 +48,7 @@ export const ParameterInput = memo<ParameterInputProps>(({
   value,
   onChange,
   expressionContext,
+  nodeId,
   isDragOver,
   onDragEnter,
   onDragLeave,
@@ -148,6 +151,7 @@ export const ParameterInput = memo<ParameterInputProps>(({
           value={typeof value === 'string' ? value : ''}
           onChange={onChange}
           context={expressionContext}
+          nodeId={nodeId}
           singleLine={type !== PropertyType.String || !typeOptions?.rows}
           height={typeOptions?.rows ? `${typeOptions.rows * 24}px` : '100px'}
           placeholder={`Enter expression... e.g. {{ $json.${name} }}`}

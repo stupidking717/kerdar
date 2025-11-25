@@ -122,6 +122,17 @@ export {
 // Execution engine
 export { WorkflowExecutor, executeWorkflow } from './engine';
 
+// Simulation engine
+export {
+  WorkflowSimulator,
+  simulateWorkflow,
+  getNodeMockDataPreview,
+  previewSimulationDataFlow,
+  type SimulationOptions,
+  type SimulationResult,
+  type NodeSimulationResult,
+} from './engine';
+
 // Types - Enums
 export {
   NodeCategory,
